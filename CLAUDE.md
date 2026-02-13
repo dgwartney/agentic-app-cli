@@ -67,7 +67,11 @@ This CLI tool integrates with the Kore.ai Agentic App Platform API to execute an
 - **Authentication**: API key via `x-api-key` header
 - **Session Identity**: Maintains conversation continuity across requests
 - **Execution Modes**: Synchronous (default) or asynchronous
-- **Streaming**: Supports token-by-token, message, or custom event streaming
+- **Streaming**: Status streaming via SSE (Server-Sent Events)
+  - **Note**: Current implementation streams status updates (busy → idle), not content
+  - Content is retrieved from Find Run Status endpoint after execution completes
+  - This is "status streaming" not "real-time content streaming"
+  - See "Streaming Behavior" section below for details
 
 ### API Endpoints
 
@@ -87,6 +91,58 @@ The following credentials must be configured (via environment variables or confi
 - Environment Name
 
 **Security Note**: Never hardcode credentials in source code.
+
+### Streaming Behavior
+
+**Important**: The Kore.ai API's "streaming mode" provides **status streaming**, not **content streaming**.
+
+#### What Streaming Mode Does
+
+When `stream.enable=true`:
+1. Server-Sent Events (SSE) provide real-time status updates
+2. Events indicate execution progress: `busy` → `idle`
+3. Events contain `runId` and session metadata
+4. **Content is NOT streamed as it's generated**
+5. Full output retrieved from Find Run Status endpoint after completion
+
+#### Workflow
+
+```
+User Query → Execute with streaming=true
+  ↓
+SSE Event 0: {"status": "busy", "runId": "r-xxx"}
+  ↓
+[Agent processes request fully]
+  ↓
+SSE Event 1: {"status": "idle", "isLastEvent": true}
+  ↓
+Call Status Endpoint: GET /runs/r-xxx/status
+  ↓
+Receive: {"run": {"kwargs": {"output": [...]}}}
+  ↓
+Display complete output
+```
+
+#### Not True Streaming
+
+This is **NOT** like ChatGPT/Claude streaming where:
+- ❌ Tokens appear one at a time as LLM generates them
+- ❌ User sees partial responses while generation is in progress
+- ❌ Content updates in real-time during processing
+
+This **IS** like:
+- ✅ Async execution with progress updates
+- ✅ Status notifications via SSE
+- ✅ Complete output after processing finishes
+- ✅ Better UX than polling (instant status changes)
+
+#### Stream Modes
+
+- `tokens`: Streams final results (NOT token-by-token generation)
+- `messages`: Streams status for message completion
+- `custom`: Custom event streaming for status updates
+
+**Recommendation**: For most use cases, regular synchronous mode (`stream.enable=false`) is simpler and equivalent since content isn't streamed anyway.
 
 ## Planned Features & Tasks
 

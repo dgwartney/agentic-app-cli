@@ -148,6 +148,8 @@ class AgenticAPIClient:
         log_api_request(url, "POST", request_body)
 
         # Check if streaming is enabled
+        # NOTE: "Streaming" provides status updates via SSE, not real-time content streaming
+        # Content is fetched from status endpoint after execution completes
         is_streaming = "stream" in request_body and request_body["stream"].get("enable", False)
 
         try:
@@ -199,11 +201,21 @@ class AgenticAPIClient:
         """
         Process Server-Sent Events (SSE) streaming response.
 
+        IMPORTANT: Kore.ai API's "streaming mode" provides STATUS streaming, not CONTENT streaming.
+
+        Behavior:
+        - SSE events contain status updates (busy → idle) and runId
+        - Events do NOT contain the actual content/output
+        - Content must be fetched separately from Find Run Status endpoint after completion
+
+        This is NOT true streaming like ChatGPT where tokens appear in real-time.
+        This IS async execution with status updates via SSE.
+
         Args:
             response: Streaming response object from requests
 
         Returns:
-            Collected response data in standard format
+            Collected response data in standard format (fetched from status endpoint)
 
         Raises:
             APIRequestError: If streaming response cannot be processed
