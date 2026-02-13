@@ -146,12 +146,14 @@ class AgenticAPIClient:
 
         # Make the request
         log_api_request(url, "POST", request_body)
+
+        # Check if streaming is enabled
+        is_streaming = "stream" in request_body and request_body["stream"].get("enable", False)
+
         try:
             response = self.session.post(
-                url, json=request_body, timeout=self.config.timeout
+                url, json=request_body, timeout=self.config.timeout, stream=is_streaming
             )
-
-            log_api_response(response.status_code, response.json() if response.text else None)
 
             # Handle different HTTP status codes
             if response.status_code == 401:
@@ -169,6 +171,7 @@ class AgenticAPIClient:
                     "Rate limit exceeded. Please retry later.", status_code=429
                 )
             elif response.status_code >= 400:
+                # For error responses, try to parse as JSON
                 error_data = response.json() if response.text else {}
                 error_message = error_data.get("error", {}).get(
                     "message", response.text or "Unknown error"
@@ -177,6 +180,12 @@ class AgenticAPIClient:
                     f"API error: {error_message}", status_code=response.status_code
                 )
 
+            # Handle streaming response (SSE format)
+            if is_streaming:
+                return self._process_streaming_response(response)
+
+            # Handle normal JSON response
+            log_api_response(response.status_code, response.json() if response.text else None)
             return response.json()
 
         except Timeout:
@@ -185,6 +194,74 @@ class AgenticAPIClient:
             )
         except RequestException as e:
             raise APIRequestError(f"Request failed: {str(e)}")
+
+    def _process_streaming_response(self, response) -> dict[str, Any]:
+        """
+        Process Server-Sent Events (SSE) streaming response.
+
+        Args:
+            response: Streaming response object from requests
+
+        Returns:
+            Collected response data in standard format
+
+        Raises:
+            APIRequestError: If streaming response cannot be processed
+        """
+        import json as json_module
+        from agentic_api_cli.logging_config import get_logger
+
+        logger = get_logger()
+        collected_content = []
+        collected_tokens = []
+
+        try:
+            # Process SSE stream line by line
+            for line in response.iter_lines(decode_unicode=True):
+                if not line:
+                    continue
+
+                # SSE events start with "data: "
+                if line.startswith("data: "):
+                    data_str = line[6:]  # Remove "data: " prefix
+
+                    # Skip [DONE] marker
+                    if data_str.strip() == "[DONE]":
+                        break
+
+                    try:
+                        # Parse the JSON data
+                        event_data = json_module.loads(data_str)
+
+                        # Collect tokens if present
+                        if "token" in event_data:
+                            token = event_data["token"]
+                            collected_tokens.append(token)
+
+                        # Collect complete messages if present
+                        if "content" in event_data:
+                            collected_content.append(event_data["content"])
+
+                    except json_module.JSONDecodeError as e:
+                        logger.warning(f"Failed to parse SSE event: {data_str[:100]}... Error: {e}")
+                        continue
+
+            # Return collected data in standard format
+            full_content = "".join(collected_tokens) if collected_tokens else "".join(collected_content)
+
+            return {
+                "output": [
+                    {
+                        "type": "text",
+                        "content": full_content
+                    }
+                ],
+                "streaming": True
+            }
+
+        except Exception as e:
+            logger.error(f"Error processing streaming response: {e}", exc_info=True)
+            raise APIRequestError(f"Failed to process streaming response: {str(e)}")
 
     def get_run_status(self, run_id: str) -> dict[str, Any]:
         """

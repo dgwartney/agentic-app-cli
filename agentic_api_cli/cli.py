@@ -674,9 +674,10 @@ Environment Variables:
             data: Response data from API
             verbose: Include verbose details
         """
+        # Print label
         print(f"\n{self.CHAT_AGENT_COLOR}Agent:{self.CHAT_RESET_COLOR} ", end="")
 
-        # Extract text content from output array
+        # Extract and print text content from output array
         if "output" in data:
             for item in data["output"]:
                 if item.get("type") == "text":
