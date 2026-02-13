@@ -243,16 +243,30 @@ Environment Variables:
             print(json.dumps(data, indent=2))
         else:
             # Pretty print for human readability
-            if "runId" in data:
-                print(f"Run ID: {data['runId']}")
-            if "status" in data:
-                print(f"Status: {data['status']}")
-            if "response" in data:
+            # Handle actual API response format with output array
+            if "output" in data:
+                # Extract text content from output array
+                for item in data["output"]:
+                    if item.get("type") == "text":
+                        print(item.get("content", ""))
+            # Handle sessionInfo for metadata
+            elif "sessionInfo" in data:
+                session_info = data["sessionInfo"]
+                if "runId" in session_info:
+                    print(f"Run ID: {session_info['runId']}")
+                if "status" in session_info:
+                    print(f"Status: {session_info['status']}")
+            # Handle old format (for backwards compatibility)
+            elif "response" in data:
                 print(f"\nResponse:\n{data['response']}")
-            if "message" in data and not data.get("response"):
+            elif "message" in data:
                 print(f"Message: {data['message']}")
+
+            # Show errors if present
             if "error" in data:
                 print(f"\nError: {data['error']}")
+
+            # Verbose mode shows full response
             if verbose:
                 print(f"\nFull Response:\n{json.dumps(data, indent=2)}")
 
