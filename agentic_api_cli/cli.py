@@ -5,6 +5,7 @@ Provides CLI commands for executing runs and checking status.
 """
 
 import argparse
+import getpass
 import json
 import sys
 from typing import NoReturn, Optional
@@ -14,6 +15,45 @@ from agentic_api_cli.client import AgenticAPIClient
 from agentic_api_cli.config import Config
 from agentic_api_cli.exceptions import AgenticAPIError
 from agentic_api_cli.logging_config import setup_logging, get_logger
+
+
+class HelpOnErrorArgumentParser(argparse.ArgumentParser):
+    """
+    Custom ArgumentParser that shows help instead of just an error message
+    when unrecognized arguments are encountered.
+    """
+
+    def error(self, message: str) -> NoReturn:
+        """
+        Override error to show help for unrecognized arguments.
+
+        Args:
+            message: Error message from argparse
+        """
+        if "unrecognized arguments" in message:
+            # Check if this is a profile subcommand to show more specific help
+            if sys.argv and len(sys.argv) >= 3 and sys.argv[1] == "profile":
+                subcommand = sys.argv[2]
+                if subcommand in ["add", "list", "delete", "set-default"]:
+                    # Create a temporary parser to show help for the specific subcommand
+                    try:
+                        # Try to parse up to the subcommand to get its help
+                        self.parse_args([sys.argv[1], subcommand, "--help"])
+                    except SystemExit:
+                        # --help will cause SystemExit, which is expected
+                        raise
+
+            # Default: show main help
+            self.print_help(sys.stderr)
+            sys.stderr.write(f"\nError: {message}\n")
+            sys.exit(2)
+        elif "invalid choice" in message:
+            self.print_help(sys.stderr)
+            sys.stderr.write(f"\nError: {message}\n")
+            sys.exit(2)
+        else:
+            # For other errors, use default behavior
+            super().error(message)
 
 
 class CLI:
@@ -98,8 +138,8 @@ class CLI:
             metavar="FILE",
         )
 
-        # Main parser
-        parser = argparse.ArgumentParser(
+        # Main parser (use custom parser for better error messages)
+        parser = HelpOnErrorArgumentParser(
             prog="agentic-api-cli",
             description="Command-line interface for Kore.ai Agentic App Platform",
             formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -256,6 +296,7 @@ Environment Variables:
             dest="profile_command",
             help="Profile operations",
             required=False,  # Allow missing subcommand to show help
+            parser_class=HelpOnErrorArgumentParser,
         )
 
         # profile add
@@ -278,7 +319,7 @@ Environment Variables:
         )
         add_profile_parser.add_argument(
             "--env-name",
-            help="Environment name (default: production)",
+            help="Environment name (default: profile name)",
         )
         add_profile_parser.add_argument(
             "--base-url",
@@ -588,9 +629,9 @@ Environment Variables:
             if not name:
                 print("Error: Profile name cannot be empty", file=sys.stderr)
                 return 1
-            api_key = input("API Key: ").strip()
+            api_key = getpass.getpass("API Key: ").strip()
             app_id = input("App ID: ").strip()
-            env_name = input("Environment name [production]: ").strip() or "production"
+            env_name = input(f"Environment name [{name}]: ").strip() or name
             base_url = input("Base URL [https://agent-platform.kore.ai/api/v2]: ").strip() or "https://agent-platform.kore.ai/api/v2"
             timeout_str = input("Timeout [30]: ").strip() or "30"
             try:
@@ -607,13 +648,13 @@ Environment Variables:
 
             api_key = args.api_key
             if not api_key:
-                api_key = input("API Key: ").strip()
+                api_key = getpass.getpass("API Key: ").strip()
 
             app_id = args.app_id
             if not app_id:
                 app_id = input("App ID: ").strip()
 
-            env_name = args.env_name or "production"
+            env_name = args.env_name or name
             base_url = args.base_url or "https://agent-platform.kore.ai/api/v2"
             timeout = args.timeout or 30
 
