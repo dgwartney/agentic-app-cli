@@ -214,11 +214,26 @@ class AgenticAPIClient:
         logger = get_logger()
         collected_content = []
         collected_tokens = []
+        line_count = 0
+        run_id = None
+        last_session_info = None
 
         try:
             # Process SSE stream line by line
-            for line in response.iter_lines(decode_unicode=True):
+            # Use chunk_size=1 to get data as soon as it arrives
+            for line in response.iter_lines(decode_unicode=True, chunk_size=1):
+                line_count += 1
+
+                # DEBUG: Log ALL lines including empty ones
+                logger.debug(f"SSE Line {line_count}: {repr(line[:200]) if line else '(empty)'}")
+
                 if not line:
+                    continue
+
+                # Check for event type lines
+                if line.startswith("event: "):
+                    event_type = line[7:].strip()
+                    logger.debug(f"Event type: {event_type}")
                     continue
 
                 # SSE events start with "data: "
@@ -227,35 +242,102 @@ class AgenticAPIClient:
 
                     # Skip [DONE] marker
                     if data_str.strip() == "[DONE]":
+                        logger.debug("Received [DONE] marker")
                         break
 
                     try:
-                        # Parse the JSON data
+                        # Parse the JSON data - Kore.ai format
                         event_data = json_module.loads(data_str)
+                        # Log the full event (not truncated)
+                        logger.debug(f"Parsed SSE event keys: {event_data.keys()}")
+                        if "output" in event_data:
+                            logger.debug(f"Event has output: {event_data['output']}")
+                        else:
+                            logger.debug(f"Event has NO output field. Full event: {json_module.dumps(event_data, indent=2)}")
 
-                        # Collect tokens if present
-                        if "token" in event_data:
-                            token = event_data["token"]
-                            collected_tokens.append(token)
+                        # Capture runId and sessionInfo for status lookup
+                        if "sessionInfo" in event_data:
+                            last_session_info = event_data["sessionInfo"]
+                            if "runId" in last_session_info:
+                                run_id = last_session_info["runId"]
+                                logger.debug(f"Captured runId: {run_id}")
 
-                        # Collect complete messages if present
-                        if "content" in event_data:
-                            collected_content.append(event_data["content"])
+                        # Extract output array from event
+                        # Format: {"eventIndex": N, "messageId": "...", "output": [...], ...}
+                        if "output" in event_data and isinstance(event_data["output"], list):
+                            for output_item in event_data["output"]:
+                                if isinstance(output_item, dict) and output_item.get("type") == "text":
+                                    content = output_item.get("content", "")
+                                    if content:
+                                        collected_content.append(content)
+                                        logger.debug(f"Collected content: {content[:100]}...")
+
+                        # Check if this is the last event
+                        if event_data.get("isLastEvent", False):
+                            logger.debug("Received isLastEvent=true")
+                            break
 
                     except json_module.JSONDecodeError as e:
                         logger.warning(f"Failed to parse SSE event: {data_str[:100]}... Error: {e}")
                         continue
+                else:
+                    # DEBUG: Log non-data lines
+                    logger.debug(f"Non-data line: {line[:200]}")
 
             # Return collected data in standard format
-            full_content = "".join(collected_tokens) if collected_tokens else "".join(collected_content)
+            # Combine all collected content pieces
+            full_content = "".join(collected_content)
 
+            logger.debug(f"Streaming complete. Lines: {line_count}, Content items: {len(collected_content)}")
+            logger.debug(f"Full content length: {len(full_content)}")
+
+            # If no content was collected from the stream, fetch it from the status endpoint
+            if not full_content and run_id and last_session_info:
+                logger.info(f"No content in stream. Fetching output from status endpoint for runId: {run_id}")
+                try:
+                    # Build sessionIdentity with only sessionReference (per API docs)
+                    session_identity = None
+                    if "sessionReference" in last_session_info:
+                        session_identity = [{
+                            "type": "sessionReference",
+                            "value": last_session_info["sessionReference"]
+                        }]
+                        logger.debug(f"Calling status endpoint with sessionIdentity: {session_identity}")
+
+                    # Call the Find Run Status endpoint to get the output
+                    status_response = self.get_run_status(run_id, session_identity)
+                    logger.debug(f"Status response: {status_response}")
+
+                    # Extract output from status response
+                    # Format: {"run": {"kwargs": {"output": [...]}}}
+                    if "run" in status_response and "kwargs" in status_response["run"]:
+                        output_data = status_response["run"]["kwargs"].get("output", [])
+                        logger.debug(f"Fetched output from status endpoint: {output_data}")
+
+                        return {
+                            "output": output_data,
+                            "sessionInfo": last_session_info,
+                            "streaming": True
+                        }
+                except Exception as e:
+                    logger.error(f"Failed to fetch output from status endpoint: {e}", exc_info=True)
+
+            # If we have content from the stream, return it
+            if full_content:
+                return {
+                    "output": [
+                        {
+                            "type": "text",
+                            "content": full_content
+                        }
+                    ],
+                    "streaming": True
+                }
+
+            # No content from either source
+            logger.warning("No content collected from streaming or status endpoint!")
             return {
-                "output": [
-                    {
-                        "type": "text",
-                        "content": full_content
-                    }
-                ],
+                "output": [],
                 "streaming": True
             }
 
@@ -263,12 +345,17 @@ class AgenticAPIClient:
             logger.error(f"Error processing streaming response: {e}", exc_info=True)
             raise APIRequestError(f"Failed to process streaming response: {str(e)}")
 
-    def get_run_status(self, run_id: str) -> dict[str, Any]:
+    def get_run_status(
+        self,
+        run_id: str,
+        session_identity: Optional[list[dict[str, str]]] = None
+    ) -> dict[str, Any]:
         """
         Get the status of an asynchronous run.
 
         Args:
             run_id: The run ID to check
+            session_identity: Optional session identity array for context verification
 
         Returns:
             Status response dictionary
@@ -286,10 +373,15 @@ class AgenticAPIClient:
         # Build request URL
         url = build_status_url(self.config.app_id, self.config.env_name, run_id)
 
+        # Build request body with sessionIdentity if provided
+        request_body = {}
+        if session_identity:
+            request_body["sessionIdentity"] = session_identity
+
         # Make the request
-        log_api_request(url, "POST", {})
+        log_api_request(url, "POST", request_body)
         try:
-            response = self.session.post(url, json={}, timeout=self.config.timeout)
+            response = self.session.post(url, json=request_body, timeout=self.config.timeout)
 
             log_api_response(response.status_code, response.json() if response.text else None)
 
