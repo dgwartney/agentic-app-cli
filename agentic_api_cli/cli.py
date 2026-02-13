@@ -85,6 +85,28 @@ class CLI:
     # Scheme 1: Cyan & Green (friendly, tech-y) ← DEFAULT
     CHAT_USER_COLOR = '\033[96m'   # Bright cyan for "You:"
     CHAT_AGENT_COLOR = '\033[92m'  # Bright green for "Agent:"
+    CHAT_USER_TEXT_COLOR = '\033[97m'   # Bright white for user message text
+    CHAT_AGENT_TEXT_COLOR = '\033[90m'  # Dim gray for agent message text (subtle)
+    #
+    # Alternative message text color schemes (uncomment to use):
+    #
+    # Scheme 2: Match label colors (strong association)
+    # CHAT_USER_TEXT_COLOR = '\033[96m'      # Cyan (same as label)
+    # CHAT_AGENT_TEXT_COLOR = '\033[92m'     # Green (same as label)
+    #
+    # Scheme 3: Inverted (playful)
+    # CHAT_USER_TEXT_COLOR = '\033[92m'      # Green
+    # CHAT_AGENT_TEXT_COLOR = '\033[96m'     # Cyan
+    #
+    # Scheme 4: Both bright (minimal)
+    # CHAT_USER_TEXT_COLOR = '\033[97m'      # Bright white
+    # CHAT_AGENT_TEXT_COLOR = '\033[97m'     # Bright white
+    #
+    # Scheme 5: High contrast
+    # CHAT_USER_TEXT_COLOR = '\033[1m\033[97m'  # Bold bright white
+    # CHAT_AGENT_TEXT_COLOR = '\033[2m\033[37m' # Dim white
+    #
+    # Alternative label color schemes:
     #
     # Scheme 2: Yellow & Magenta (vibrant, high contrast)
     # CHAT_USER_COLOR = '\033[93m'   # Bright yellow for "You:"
@@ -658,7 +680,8 @@ Environment Variables:
         if "output" in data:
             for item in data["output"]:
                 if item.get("type") == "text":
-                    print(item.get("content", ""))
+                    content = item.get("content", "")
+                    print(f"{self.CHAT_AGENT_TEXT_COLOR}{content}{self.CHAT_RESET_COLOR}")
 
         # Show debug information if present and verbose
         if "debug" in data and verbose:
