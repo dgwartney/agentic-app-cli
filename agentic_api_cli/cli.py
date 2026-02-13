@@ -255,7 +255,7 @@ Environment Variables:
         profile_subparsers = profile_parser.add_subparsers(
             dest="profile_command",
             help="Profile operations",
-            required=True,
+            required=False,  # Allow missing subcommand to show help
         )
 
         # profile add
@@ -310,6 +310,7 @@ Environment Variables:
         )
         delete_profile_parser.add_argument(
             "name",
+            nargs='?',  # Make optional to allow showing help
             help="Profile name to delete",
         )
 
@@ -321,6 +322,7 @@ Environment Variables:
         )
         set_default_parser.add_argument(
             "name",
+            nargs='?',  # Make optional to allow showing help
             help="Profile name to set as default",
         )
 
@@ -542,6 +544,12 @@ Environment Variables:
 
         manager = ProfileManager()
 
+        # Show help if no subcommand provided
+        if not args.profile_command:
+            # Get the profile parser to print help
+            self.parser.parse_args(['profile', '--help'])
+            return 0
+
         try:
             if args.profile_command == "add":
                 return self._handle_profile_add(args, manager)
@@ -668,6 +676,11 @@ Environment Variables:
         Returns:
             Exit code (0 for success, 1 for error)
         """
+        # Show help if name not provided
+        if not args.name:
+            self.parser.parse_args(['profile', 'delete', '--help'])
+            return 0
+
         name = args.name
 
         # Confirm deletion
@@ -698,6 +711,11 @@ Environment Variables:
         Returns:
             Exit code (0 for success, 1 for error)
         """
+        # Show help if name not provided
+        if not args.name:
+            self.parser.parse_args(['profile', 'set-default', '--help'])
+            return 0
+
         name = args.name
         manager.set_default_profile(name)
         print(f"Default profile set to '{name}'")
