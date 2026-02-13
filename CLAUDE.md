@@ -92,56 +92,6 @@ The following credentials must be configured (via environment variables or confi
 
 The following features are planned for future implementation:
 
-### Task 5: Implement special commands in chat mode
-
-Add special commands with '#' prefix for chat mode to control session and display information.
-
-**Special commands (all start with #):**
-- `#help` - Show available special commands
-- `#new` or `#newsession` - Start a new session (new session ID)
-- `#info` or `#session` - Display current session information
-- `#clear` - Clear the terminal screen
-- `#history` - Show conversation history (if history tracking enabled)
-- `#debug on|off` - Toggle debug mode
-- `#stream on|off` - Toggle streaming mode
-- `#exit` or `#quit` - Exit chat (same as 'exit')
-
-**Example usage in chat:**
-```
-You: #help
-Available commands:
-  #help           - Show this help
-  #new            - Start a new session
-  #info           - Show session information
-  #clear          - Clear screen
-  #history        - Show conversation history
-  #debug on|off   - Toggle debug mode
-  #stream on|off  - Toggle streaming
-  #exit           - Exit chat
-
-You: #info
-Session Information:
-  Session ID: chat-1234-5678
-  User ID: chat-1234-5678
-  Environment: draft
-  App ID: aa-c1bcf7e2-3c10-4c67-9b8a-4d79be0110af
-  Debug: off
-  Streaming: off
-
-You: #debug on
-Debug mode enabled
-```
-
-**Implementation:**
-- Add command parser for lines starting with '#'
-- Implement handler for each special command
-- Track session state (debug, stream settings)
-- Allow toggling options during chat
-- Show helpful feedback for each command
-- Handle invalid commands gracefully
-
-**Depends on:** Task 4 (Create interactive chat command)
-
 ### Task 6: Auto-generate session ID for chat command
 
 Automatically generate unique session IDs when starting chat mode if not provided by user.
@@ -263,3 +213,17 @@ Agent: Hi! Welcome! How can I help you?
 - Empty input handling: skips silently and re-prompts
 - Clean shutdown with goodbye message
 - 12 comprehensive tests covering all scenarios
+
+### ✅ Task 5: Implement special commands in chat mode
+- Added special commands with '#' prefix for in-chat control
+- Commands: #help, #new, #info, #clear, #debug, #stream, #history (placeholder)
+- Dict-based command dispatch with aliases (#new/#newsession, #info/#session)
+- State management: toggle debug/stream modes during chat without restarting
+- Session management: #new generates fresh session with new ID for new context
+- Case-insensitive commands and arguments for better UX
+- Graceful error handling for unknown commands (shows helpful message, continues chat)
+- Exit chat using 'exit', 'quit', or 'q' (no # prefix for simplicity/REPL convention)
+- 13 comprehensive tests covering all commands, state changes, and edge cases
+- Integration: Special command check inserted into chat loop before exit check
+- Updated welcome banner to mention '#help' for discoverability
+- ~230 lines of implementation code across dispatcher and 7 command handlers

@@ -4,11 +4,14 @@ A Python command-line interface for interacting with the Kore.ai Agentic App Pla
 
 ## Features
 
+- **Interactive Chat Mode**: REPL-style chat interface with session management and special commands
+- **Special Commands**: Runtime control with `#help`, `#new`, `#info`, `#clear`, `#debug`, `#stream` commands
 - **Profile Management**: Store and manage multiple configuration sets for different environments
 - **Execute AI agent runs**: Synchronous or asynchronous execution modes
 - **Real-time streaming**: Stream responses token-by-token, by message, or with custom events
 - **Status checking**: Monitor and poll async run status
-- **Debug mode**: Comprehensive debugging support for development
+- **Enhanced debug modes**: Comprehensive debugging with `all`, `function-call`, and `thoughts` modes
+- **Advanced logging**: Python standard library logging with file output and configurable log levels
 - **File attachments**: Support for attaching files to requests
 - **Session management**: Maintain conversation continuity across requests
 - **Flexible configuration**: Multiple configuration methods with clear precedence rules
@@ -59,7 +62,15 @@ Set it as the default:
 agentic-api-cli profile set-default production
 ```
 
-### 3. Execute Your First Run
+### 3. Start Chatting (Interactive Mode)
+
+```bash
+agentic-api-cli chat
+```
+
+Type your messages and use special commands like `#help`, `#debug on`, or `#new` for runtime control. Type `exit` to quit.
+
+### 4. Or Execute a Single Query
 
 ```bash
 agentic-api-cli execute \
@@ -67,7 +78,7 @@ agentic-api-cli execute \
   --session-id my-session-001
 ```
 
-### 4. View Configuration
+### 5. View Configuration
 
 ```bash
 agentic-api-cli config
@@ -236,6 +247,56 @@ agentic-api-cli status \
   --max-attempts 30
 ```
 
+### Interactive Chat Mode
+
+Start an interactive chat session:
+```bash
+agentic-api-cli chat
+```
+
+Chat with streaming enabled:
+```bash
+agentic-api-cli chat --stream tokens
+```
+
+Chat with debug mode:
+```bash
+agentic-api-cli chat --debug --debug-mode thoughts
+```
+
+**Special Commands in Chat:**
+
+Once in chat mode, use special commands for runtime control:
+
+```
+You: #help
+Available Commands:
+  #help              - Show this help message
+  #new               - Start a new session
+  #info              - Show current session information
+  #clear             - Clear the terminal screen
+  #debug on|off      - Toggle debug mode
+  #stream on|off|tokens|messages|custom - Toggle streaming
+
+To exit chat, type: exit, quit, or q
+
+You: #debug on
+Debug mode enabled
+
+You: What is Python?
+Agent: [Response with debug information...]
+
+You: #new
+╔═══════════════════════════════════════╗
+║         New Session Started           ║
+╚═══════════════════════════════════════╝
+Previous Session: chat-1234567890
+New Session: chat-1234567920
+
+You: exit
+Goodbye! Session ended.
+```
+
 ### Debug Mode
 
 Enable debug output for development:
@@ -244,6 +305,43 @@ agentic-api-cli execute \
   --query "Test query" \
   --session-id session-001 \
   --debug
+```
+
+Enable specific debug modes:
+```bash
+# Show all debug information
+agentic-api-cli execute \
+  --query "Test query" \
+  --session-id session-001 \
+  --debug --debug-mode all
+
+# Show only function calls
+agentic-api-cli execute \
+  --query "Test query" \
+  --session-id session-001 \
+  --debug --debug-mode function-call
+
+# Show agent thoughts
+agentic-api-cli execute \
+  --query "Test query" \
+  --session-id session-001 \
+  --debug --debug-mode thoughts
+```
+
+### Logging
+
+Enable file logging:
+```bash
+agentic-api-cli --log-file app.log execute \
+  --query "Test query" \
+  --session-id session-001
+```
+
+Set log level:
+```bash
+agentic-api-cli --log-level DEBUG execute \
+  --query "Test query" \
+  --session-id session-001
 ```
 
 ### Show Current Configuration
@@ -366,7 +464,23 @@ For issues and questions:
 
 ## Changelog
 
-### 0.2.0 (Profile Management)
+### 0.5.0 (Chat Mode & Special Commands)
+
+- **Interactive Chat Mode**: REPL-style chat interface with persistent sessions
+- **Special Commands**: Runtime control commands (`#help`, `#new`, `#info`, `#clear`, `#debug`, `#stream`)
+- **Session Management**: Auto-generated session IDs with ability to start fresh sessions
+- **Toggle Settings**: Change debug and streaming modes without restarting chat
+- **Improved UX**: Case-insensitive commands, helpful error messages, discoverable features
+
+### 0.4.0 (Enhanced Debug & Logging)
+
+- **Debug Modes**: Support for `all`, `function-call`, and `thoughts` debug modes
+- **Advanced Logging**: Python standard library logging with file output
+- **Log Levels**: Configurable log levels (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+- **Secure Logging**: Automatic masking of sensitive data in logs
+- **Verbose Output**: Enhanced verbose mode with detailed debug information
+
+### 0.3.0 (Profile Management)
 
 - **Profile Management**: Add, list, delete, and manage configuration profiles
 - **Default Profiles**: Set a default profile to use automatically
@@ -374,11 +488,18 @@ For issues and questions:
 - **Configuration Precedence**: Clear precedence rules (CLI args > Env vars > Profiles > Defaults)
 - **Interactive Profile Creation**: Create profiles interactively or via CLI arguments
 - **Profile Display**: List profiles with masked or full API keys
-- **Updated Documentation**: Comprehensive profile management documentation
+
+### 0.2.0 (Streaming & Session Support)
+
+- **Real-time Streaming**: Token-by-token, message, and custom event streaming
+- **Session Identity**: Maintain conversation continuity across requests
+- **Async Execution**: Asynchronous run execution with status polling
+- **Enhanced Error Handling**: Better error messages and recovery
 
 ### 0.1.0 (Initial Release)
 
 - Initial package structure
 - API type definitions and reference implementation
 - Basic CLI framework
+- Execute and status commands
 - Documentation and examples

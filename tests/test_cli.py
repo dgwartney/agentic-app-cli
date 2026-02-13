@@ -3,6 +3,8 @@ Unit tests for CLI.
 """
 
 import json
+import os
+import time
 from io import StringIO
 from unittest.mock import Mock, patch
 
@@ -844,3 +846,250 @@ class TestChatCommand:
 
         assert exit_code == 1
         assert "Invalid JSON" in fake_err.getvalue()
+
+
+class TestChatSpecialCommands:
+    """Test special commands in chat mode."""
+
+    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("builtins.input")
+    def test_help_command(self, mock_input, mock_client_class, cli, mock_env):
+        """Test #help command displays available commands."""
+        mock_input.side_effect = ["#help", "exit"]
+
+        mock_client = Mock()
+        mock_client_class.return_value = mock_client
+
+        with patch("sys.stdout", new=StringIO()) as fake_out:
+            exit_code = cli.run(["chat"])
+
+        assert exit_code == 0
+        output = fake_out.getvalue()
+        assert "Available Commands:" in output
+        assert "#help" in output
+        assert "#debug" in output
+        # Should NOT call execute_run for special commands
+        mock_client.execute_run.assert_not_called()
+
+    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("builtins.input")
+    def test_debug_toggle_on(self, mock_input, mock_client_class, cli, mock_env):
+        """Test #debug on enables debug mode."""
+        mock_input.side_effect = ["#debug on", "#info", "exit"]
+
+        mock_client = Mock()
+        mock_client_class.return_value = mock_client
+
+        with patch("sys.stdout", new=StringIO()) as fake_out:
+            exit_code = cli.run(["chat"])
+
+        assert exit_code == 0
+        output = fake_out.getvalue()
+        assert "Debug mode enabled" in output
+        assert "Debug: enabled" in output
+
+    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("builtins.input")
+    def test_debug_affects_api_calls(self, mock_input, mock_client_class, cli, mock_env):
+        """Test that #debug on affects subsequent API calls."""
+        mock_input.side_effect = ["#debug on", "test query", "exit"]
+
+        mock_client = Mock()
+        mock_client.execute_run.return_value = {
+            "output": [{"type": "text", "content": "Response"}],
+            "sessionInfo": {},
+        }
+        mock_client_class.return_value = mock_client
+
+        exit_code = cli.run(["chat"])
+
+        assert exit_code == 0
+        call_kwargs = mock_client.execute_run.call_args[1]
+        assert call_kwargs["debug_enabled"] is True
+
+    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("builtins.input")
+    def test_stream_command(self, mock_input, mock_client_class, cli, mock_env):
+        """Test #stream tokens enables token streaming."""
+        mock_input.side_effect = ["#stream tokens", "test", "exit"]
+
+        mock_client = Mock()
+        mock_client.execute_run.return_value = {
+            "output": [{"type": "text", "content": "Response"}],
+            "sessionInfo": {},
+        }
+        mock_client_class.return_value = mock_client
+
+        exit_code = cli.run(["chat"])
+
+        assert exit_code == 0
+        call_kwargs = mock_client.execute_run.call_args[1]
+        assert call_kwargs["stream_enabled"] is True
+        assert call_kwargs["stream_mode"] == "tokens"
+
+    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("builtins.input")
+    @patch("time.time")
+    def test_new_command_changes_session(self, mock_time, mock_input, mock_client_class, cli, mock_env):
+        """Test #new command generates new session ID."""
+        # Mock time to return different values for session IDs
+        mock_time.side_effect = [1000, 2000]  # First session, then new session
+
+        mock_input.side_effect = ["test1", "#new", "test2", "exit"]
+
+        mock_client = Mock()
+        mock_client.execute_run.return_value = {
+            "output": [{"type": "text", "content": "Response"}],
+            "sessionInfo": {},
+        }
+        mock_client_class.return_value = mock_client
+
+        with patch("sys.stdout", new=StringIO()) as fake_out:
+            exit_code = cli.run(["chat"])
+
+        assert exit_code == 0
+        output = fake_out.getvalue()
+        assert "New Session Started" in output
+
+        # Verify different session IDs
+        assert mock_client.execute_run.call_count == 2
+        session_1 = mock_client.execute_run.call_args_list[0][1]["session_identity"]
+        session_2 = mock_client.execute_run.call_args_list[1][1]["session_identity"]
+        assert session_1 != session_2
+
+    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("builtins.input")
+    def test_info_command(self, mock_input, mock_client_class, cli, mock_env):
+        """Test #info displays session information."""
+        mock_input.side_effect = ["#info", "exit"]
+
+        mock_client = Mock()
+        mock_client_class.return_value = mock_client
+
+        with patch("sys.stdout", new=StringIO()) as fake_out:
+            exit_code = cli.run(["chat"])
+
+        assert exit_code == 0
+        output = fake_out.getvalue()
+        assert "Session Information:" in output
+        assert "Session ID:" in output
+        assert "Environment:" in output
+
+    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("builtins.input")
+    @patch("os.system")
+    def test_clear_command(self, mock_system, mock_input, mock_client_class, cli, mock_env):
+        """Test #clear command clears screen."""
+        mock_input.side_effect = ["#clear", "exit"]
+
+        mock_client = Mock()
+        mock_client_class.return_value = mock_client
+
+        exit_code = cli.run(["chat"])
+
+        assert exit_code == 0
+        mock_system.assert_called_once()
+        call_arg = mock_system.call_args[0][0]
+        assert call_arg in ['clear', 'cls']
+
+    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("builtins.input")
+    def test_unknown_command(self, mock_input, mock_client_class, cli, mock_env):
+        """Test unknown special command shows error."""
+        mock_input.side_effect = ["#unknown", "exit"]
+
+        mock_client = Mock()
+        mock_client_class.return_value = mock_client
+
+        with patch("sys.stdout", new=StringIO()) as fake_out:
+            exit_code = cli.run(["chat"])
+
+        assert exit_code == 0
+        output = fake_out.getvalue()
+        assert "Unknown command: #unknown" in output
+        assert "#help" in output
+
+    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("builtins.input")
+    def test_case_insensitive_commands(self, mock_input, mock_client_class, cli, mock_env):
+        """Test special commands are case-insensitive."""
+        mock_input.side_effect = ["#HELP", "#Debug ON", "exit"]
+
+        mock_client = Mock()
+        mock_client_class.return_value = mock_client
+
+        with patch("sys.stdout", new=StringIO()) as fake_out:
+            exit_code = cli.run(["chat"])
+
+        assert exit_code == 0
+        output = fake_out.getvalue()
+        assert "Available Commands:" in output
+        assert "Debug mode enabled" in output
+
+    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("builtins.input")
+    def test_command_aliases(self, mock_input, mock_client_class, cli, mock_env):
+        """Test command aliases work."""
+        mock_input.side_effect = ["#newsession", "#session", "exit"]
+
+        mock_client = Mock()
+        mock_client_class.return_value = mock_client
+
+        with patch("sys.stdout", new=StringIO()) as fake_out:
+            exit_code = cli.run(["chat"])
+
+        assert exit_code == 0
+        output = fake_out.getvalue()
+        assert "New Session Started" in output
+        assert "Session Information:" in output
+
+    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("builtins.input")
+    def test_debug_query_state(self, mock_input, mock_client_class, cli, mock_env):
+        """Test #debug without args shows current state."""
+        mock_input.side_effect = ["#debug", "exit"]
+
+        mock_client = Mock()
+        mock_client_class.return_value = mock_client
+
+        with patch("sys.stdout", new=StringIO()) as fake_out:
+            exit_code = cli.run(["chat"])
+
+        assert exit_code == 0
+        output = fake_out.getvalue()
+        assert "Debug mode is currently" in output
+
+    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("builtins.input")
+    def test_stream_toggle_off(self, mock_input, mock_client_class, cli, mock_env):
+        """Test #stream off disables streaming."""
+        mock_input.side_effect = ["#stream off", "test", "exit"]
+
+        mock_client = Mock()
+        mock_client.execute_run.return_value = {
+            "output": [{"type": "text", "content": "Response"}],
+            "sessionInfo": {},
+        }
+        mock_client_class.return_value = mock_client
+
+        exit_code = cli.run(["chat", "--stream", "tokens"])  # Start with streaming on
+
+        assert exit_code == 0
+        call_kwargs = mock_client.execute_run.call_args[1]
+        assert call_kwargs["stream_enabled"] is False
+
+    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("builtins.input")
+    def test_history_placeholder(self, mock_input, mock_client_class, cli, mock_env):
+        """Test #history shows placeholder message."""
+        mock_input.side_effect = ["#history", "exit"]
+
+        mock_client = Mock()
+        mock_client_class.return_value = mock_client
+
+        with patch("sys.stdout", new=StringIO()) as fake_out:
+            exit_code = cli.run(["chat"])
+
+        assert exit_code == 0
+        output = fake_out.getvalue()
+        assert "History feature not yet implemented" in output

@@ -539,12 +539,12 @@ Environment Variables:
             env_name: Environment name
         """
         print("╔═══════════════════════════════════════╗")
-        print("║   Agentic API Chat Session Started   ║")
+        print("║   Agentic API Chat Session Started    ║")
         print("╚═══════════════════════════════════════╝")
         print(f"Session ID: {session_id}")
         print(f"Environment: {env_name}")
         print()
-        print("Type your message or 'exit' to quit.")
+        print("Type your message or 'exit' to quit. Type '#help' for commands.")
 
     def _print_chat_response(self, data: dict, verbose: bool = False) -> None:
         """
@@ -566,6 +566,215 @@ Environment Variables:
         if "debug" in data and verbose:
             debug_info = data["debug"]
             print(f"\n[Debug] {json.dumps(debug_info, indent=2)}")
+
+    def _handle_chat_special_command(
+        self,
+        user_input: str,
+        args: argparse.Namespace,
+        session_id: str
+    ) -> tuple[bool, str | None]:
+        """
+        Handle special commands (starting with #) in chat mode.
+
+        Args:
+            user_input: The user input string (already stripped)
+            args: Parsed command-line arguments (mutable, modified in place)
+            session_id: Current session ID
+
+        Returns:
+            Tuple of (should_continue, new_session_id):
+                - should_continue: True to continue chat loop, False to exit
+                - new_session_id: New session ID if command changed it, None otherwise
+        """
+        logger = get_logger()
+
+        # Split command and arguments
+        parts = user_input.split(maxsplit=1)
+        command = parts[0].lower()  # Case-insensitive
+        command_args = parts[1].strip() if len(parts) > 1 else ""
+
+        # Command dispatch table with aliases
+        command_handlers = {
+            '#help': self._chat_cmd_help,
+            '#new': self._chat_cmd_new,
+            '#newsession': self._chat_cmd_new,  # Alias
+            '#info': self._chat_cmd_info,
+            '#session': self._chat_cmd_info,  # Alias
+            '#clear': self._chat_cmd_clear,
+            '#debug': self._chat_cmd_debug,
+            '#stream': self._chat_cmd_stream,
+            '#history': self._chat_cmd_history,
+        }
+
+        if command in command_handlers:
+            logger.debug(f"Handling special command: {command}")
+            return command_handlers[command](command_args, args, session_id)
+        else:
+            # Unknown command - show error and continue
+            print(f"Unknown command: {command}. Type #help for available commands.")
+            logger.warning(f"Unknown special command attempted: {command}")
+            return (True, None)
+
+    def _chat_cmd_help(
+        self, command_args: str, args: argparse.Namespace, session_id: str
+    ) -> tuple[bool, str | None]:
+        """Display help for special commands."""
+        print("\nAvailable Commands:")
+        print("  #help              - Show this help message")
+        print("  #new               - Start a new session")
+        print("  #info              - Show current session information")
+        print("  #clear             - Clear the terminal screen")
+        print("  #debug on|off      - Toggle debug mode")
+        print("  #stream on|off|tokens|messages|custom - Toggle streaming")
+        print("\nTo exit chat, type: exit, quit, or q")
+        print()
+        return (True, None)
+
+    def _chat_cmd_debug(
+        self, command_args: str, args: argparse.Namespace, session_id: str
+    ) -> tuple[bool, str | None]:
+        """Handle #debug on|off command."""
+        logger = get_logger()
+
+        if not command_args:
+            # Show current state
+            state = "enabled" if getattr(args, 'debug', False) else "disabled"
+            print(f"Debug mode is currently {state}")
+            return (True, None)
+
+        arg = command_args.lower()
+        if arg == "on":
+            args.debug = True
+            args.debug_mode = None  # Reset to default
+            print("Debug mode enabled")
+            logger.info("Debug mode enabled via chat command")
+        elif arg == "off":
+            args.debug = False
+            args.debug_mode = None
+            print("Debug mode disabled")
+            logger.info("Debug mode disabled via chat command")
+        else:
+            print(f"Invalid argument: '{command_args}'. Use '#debug on' or '#debug off'")
+
+        return (True, None)
+
+    def _chat_cmd_stream(
+        self, command_args: str, args: argparse.Namespace, session_id: str
+    ) -> tuple[bool, str | None]:
+        """Handle #stream on|off|tokens|messages|custom command."""
+        logger = get_logger()
+
+        if not command_args:
+            # Show current state
+            current = getattr(args, 'stream', None)
+            if current:
+                print(f"Streaming is enabled: {current}")
+            else:
+                print("Streaming is disabled")
+            return (True, None)
+
+        arg = command_args.lower()
+        valid_modes = ["tokens", "messages", "custom"]
+
+        if arg == "off":
+            args.stream = None
+            print("Streaming disabled")
+            logger.info("Streaming disabled via chat command")
+        elif arg == "on":
+            args.stream = "tokens"  # Default mode
+            print("Streaming enabled (mode: tokens)")
+            logger.info("Streaming enabled with default mode: tokens")
+        elif arg in valid_modes:
+            args.stream = arg
+            print(f"Streaming enabled (mode: {arg})")
+            logger.info(f"Streaming mode set to: {arg}")
+        else:
+            print(f"Invalid argument: '{command_args}'")
+            print("Use: #stream on|off|tokens|messages|custom")
+
+        return (True, None)
+
+    def _chat_cmd_new(
+        self, command_args: str, args: argparse.Namespace, session_id: str
+    ) -> tuple[bool, str | None]:
+        """Start a new session with new session ID."""
+        logger = get_logger()
+
+        # Generate new session ID
+        new_session_id = self._generate_simple_session_id()
+
+        # Display banner
+        print("\n╔═══════════════════════════════════════╗")
+        print("║         New Session Started           ║")
+        print("╚═══════════════════════════════════════╝")
+        print(f"Previous Session: {session_id}")
+        print(f"New Session: {new_session_id}")
+        print()
+
+        logger.info(f"New session started. Old: {session_id}, New: {new_session_id}")
+
+        # Return new session ID
+        return (True, new_session_id)
+
+    def _chat_cmd_info(
+        self, command_args: str, args: argparse.Namespace, session_id: str
+    ) -> tuple[bool, str | None]:
+        """Display current session information."""
+        logger = get_logger()
+
+        print("\nSession Information:")
+        print(f"  Session ID: {session_id}")
+        print(f"  Environment: {self.config.env_name}")
+        print(f"  App ID: {self.config.app_id}")
+
+        # Show optional settings
+        user_id = getattr(args, 'user_id', None)
+        if user_id:
+            print(f"  User ID: {user_id}")
+
+        # Show debug state
+        debug_enabled = getattr(args, 'debug', False)
+        debug_mode = getattr(args, 'debug_mode', None)
+        if debug_enabled:
+            if debug_mode:
+                print(f"  Debug: enabled ({debug_mode})")
+            else:
+                print(f"  Debug: enabled")
+        else:
+            print(f"  Debug: disabled")
+
+        # Show streaming state
+        stream = getattr(args, 'stream', None)
+        if stream:
+            print(f"  Streaming: {stream}")
+        else:
+            print(f"  Streaming: disabled")
+
+        print()
+        logger.debug(f"Displayed session info for session: {session_id}")
+        return (True, None)
+
+    def _chat_cmd_clear(
+        self, command_args: str, args: argparse.Namespace, session_id: str
+    ) -> tuple[bool, str | None]:
+        """Clear the terminal screen."""
+        import os
+
+        # Cross-platform clear screen
+        os.system('cls' if os.name == 'nt' else 'clear')
+
+        # Re-display banner after clearing
+        self._print_chat_banner(session_id, self.config.env_name)
+
+        return (True, None)
+
+    def _chat_cmd_history(
+        self, command_args: str, args: argparse.Namespace, session_id: str
+    ) -> tuple[bool, str | None]:
+        """Show conversation history (future feature)."""
+        print("History feature not yet implemented.")
+        print("Future: This will show your conversation history.")
+        return (True, None)
 
     def _handle_execute(self, args: argparse.Namespace) -> int:
         """
@@ -721,6 +930,20 @@ Environment Variables:
 
                 # Skip empty input
                 if not user_input:
+                    continue
+
+                # Check for special commands (starts with #)
+                if user_input.startswith('#'):
+                    should_continue, new_session = self._handle_chat_special_command(
+                        user_input, args, session_id
+                    )
+                    # Update session ID if command changed it
+                    if new_session:
+                        session_id = new_session
+                    # Exit loop if command requested it
+                    if not should_continue:
+                        return 0
+                    # Continue to next iteration (don't execute as query)
                     continue
 
                 # Check for exit commands
