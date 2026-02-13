@@ -63,6 +63,47 @@ class CLI:
     Handles argument parsing and command execution.
     """
 
+    # ═══════════════════════════════════════════════════════════════════
+    # Chat Color Configuration
+    # ═══════════════════════════════════════════════════════════════════
+    # ANSI color codes for chat interface labels.
+    # Change these to customize the appearance of the chat interface.
+    #
+    # Available colors:
+    #   CYAN    = '\033[96m'  # Bright cyan
+    #   GREEN   = '\033[92m'  # Bright green
+    #   YELLOW  = '\033[93m'  # Bright yellow
+    #   BLUE    = '\033[94m'  # Bright blue
+    #   MAGENTA = '\033[95m'  # Bright magenta
+    #   RED     = '\033[91m'  # Bright red
+    #   WHITE   = '\033[97m'  # Bright white
+    #   BOLD    = '\033[1m'   # Bold text
+    #   RESET   = '\033[0m'   # Reset to default
+    #
+    # Suggested color schemes (uncomment one):
+    #
+    # Scheme 1: Cyan & Green (friendly, tech-y) ← DEFAULT
+    CHAT_USER_COLOR = '\033[96m'   # Bright cyan for "You:"
+    CHAT_AGENT_COLOR = '\033[92m'  # Bright green for "Agent:"
+    #
+    # Scheme 2: Yellow & Magenta (vibrant, high contrast)
+    # CHAT_USER_COLOR = '\033[93m'   # Bright yellow for "You:"
+    # CHAT_AGENT_COLOR = '\033[95m'  # Bright magenta for "Agent:"
+    #
+    # Scheme 3: Green & Blue (calm, professional)
+    # CHAT_USER_COLOR = '\033[92m'   # Bright green for "You:"
+    # CHAT_AGENT_COLOR = '\033[94m'  # Bright blue for "Agent:"
+    #
+    # Scheme 4: White & Cyan (clean, modern)
+    # CHAT_USER_COLOR = '\033[97m'   # Bright white for "You:"
+    # CHAT_AGENT_COLOR = '\033[96m'  # Bright cyan for "Agent:"
+    #
+    # Scheme 5: Bold Cyan & Bold Green (emphasized)
+    # CHAT_USER_COLOR = '\033[1m\033[96m'   # Bold bright cyan for "You:"
+    # CHAT_AGENT_COLOR = '\033[1m\033[92m'  # Bold bright green for "Agent:"
+
+    CHAT_RESET_COLOR = '\033[0m'   # Reset color (don't change this)
+
     def __init__(self) -> None:
         """Initialize the CLI."""
         self.parser = self._create_parser()
@@ -557,7 +598,7 @@ Environment Variables:
             data: Response data from API
             verbose: Include verbose details
         """
-        print("\nAgent: ", end="")
+        print(f"\n{self.CHAT_AGENT_COLOR}Agent:{self.CHAT_RESET_COLOR} ", end="")
 
         # Extract text content from output array
         if "output" in data:
@@ -932,7 +973,7 @@ Environment Variables:
         while True:
             try:
                 # Get user input
-                user_input = input("\nYou: ").strip()
+                user_input = input(f"\n{self.CHAT_USER_COLOR}You:{self.CHAT_RESET_COLOR} ").strip()
 
                 # Skip empty input
                 if not user_input:
