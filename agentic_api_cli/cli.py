@@ -102,6 +102,34 @@ class CLI:
     # CHAT_USER_COLOR = '\033[1m\033[96m'   # Bold bright cyan for "You:"
     # CHAT_AGENT_COLOR = '\033[1m\033[92m'  # Bold bright green for "Agent:"
 
+    # ───────────────────────────────────────────────────────────────────
+    # #info Command Color Configuration (Option 1: Professional & Clear)
+    # ───────────────────────────────────────────────────────────────────
+    INFO_HEADER_COLOR = '\033[1m\033[96m'   # Bold cyan for "Session Information:"
+    INFO_LABEL_COLOR = '\033[36m'           # Dim cyan for field labels
+    INFO_VALUE_COLOR = '\033[97m'           # Bright white for values
+    INFO_ENV_COLOR = '\033[93m'             # Bright yellow for environment (highlight)
+    INFO_ENABLED_COLOR = '\033[92m'         # Bright green for "enabled"
+    INFO_DISABLED_COLOR = '\033[2m\033[93m' # Dim yellow for "disabled"
+    #
+    # Alternative schemes (uncomment to use):
+    #
+    # Option 2: Vibrant & Modern
+    # INFO_HEADER_COLOR = '\033[1m\033[95m'   # Bold magenta
+    # INFO_LABEL_COLOR = '\033[96m'           # Bright cyan
+    # INFO_VALUE_COLOR = '\033[97m'           # Bright white
+    # INFO_ENV_COLOR = '\033[93m'             # Bright yellow
+    # INFO_ENABLED_COLOR = '\033[92m'         # Bright green
+    # INFO_DISABLED_COLOR = '\033[91m'        # Bright red
+    #
+    # Option 3: Subtle & Minimal
+    # INFO_HEADER_COLOR = '\033[1m'           # Bold (no color)
+    # INFO_LABEL_COLOR = '\033[36m'           # Cyan
+    # INFO_VALUE_COLOR = '\033[0m'            # Default
+    # INFO_ENV_COLOR = '\033[92m'             # Green
+    # INFO_ENABLED_COLOR = '\033[92m'         # Green
+    # INFO_DISABLED_COLOR = '\033[2m'         # Dim
+
     CHAT_RESET_COLOR = '\033[0m'   # Reset color (don't change this)
 
     def __init__(self) -> None:
@@ -766,33 +794,41 @@ Environment Variables:
         """Display current session information."""
         logger = get_logger()
 
-        print("\nSession Information:")
-        print(f"  Session ID: {session_id}")
-        print(f"  Environment: {self.config.env_name}")
-        print(f"  App ID: {self.config.app_id}")
+        # Header
+        print(f"\n{self.INFO_HEADER_COLOR}Session Information:{self.CHAT_RESET_COLOR}")
+
+        # Session ID
+        print(f"  {self.INFO_LABEL_COLOR}Session ID:{self.CHAT_RESET_COLOR} {self.INFO_VALUE_COLOR}{session_id}{self.CHAT_RESET_COLOR}")
+
+        # Environment (highlighted in yellow)
+        print(f"  {self.INFO_LABEL_COLOR}Environment:{self.CHAT_RESET_COLOR} {self.INFO_ENV_COLOR}{self.config.env_name}{self.CHAT_RESET_COLOR}")
+
+        # App ID
+        print(f"  {self.INFO_LABEL_COLOR}App ID:{self.CHAT_RESET_COLOR} {self.INFO_VALUE_COLOR}{self.config.app_id}{self.CHAT_RESET_COLOR}")
 
         # Show optional settings
         user_id = getattr(args, 'user_id', None)
         if user_id:
-            print(f"  User ID: {user_id}")
+            print(f"  {self.INFO_LABEL_COLOR}User ID:{self.CHAT_RESET_COLOR} {self.INFO_VALUE_COLOR}{user_id}{self.CHAT_RESET_COLOR}")
 
         # Show debug state
         debug_enabled = getattr(args, 'debug', False)
         debug_mode = getattr(args, 'debug_mode', None)
         if debug_enabled:
+            status = f"{self.INFO_ENABLED_COLOR}enabled{self.CHAT_RESET_COLOR}"
             if debug_mode:
-                print(f"  Debug: enabled ({debug_mode})")
+                print(f"  {self.INFO_LABEL_COLOR}Debug:{self.CHAT_RESET_COLOR} {status} ({self.INFO_VALUE_COLOR}{debug_mode}{self.CHAT_RESET_COLOR})")
             else:
-                print(f"  Debug: enabled")
+                print(f"  {self.INFO_LABEL_COLOR}Debug:{self.CHAT_RESET_COLOR} {status}")
         else:
-            print(f"  Debug: disabled")
+            print(f"  {self.INFO_LABEL_COLOR}Debug:{self.CHAT_RESET_COLOR} {self.INFO_DISABLED_COLOR}disabled{self.CHAT_RESET_COLOR}")
 
         # Show streaming state
         stream = getattr(args, 'stream', None)
         if stream:
-            print(f"  Streaming: {stream}")
+            print(f"  {self.INFO_LABEL_COLOR}Streaming:{self.CHAT_RESET_COLOR} {self.INFO_ENABLED_COLOR}{stream}{self.CHAT_RESET_COLOR}")
         else:
-            print(f"  Streaming: disabled")
+            print(f"  {self.INFO_LABEL_COLOR}Streaming:{self.CHAT_RESET_COLOR} {self.INFO_DISABLED_COLOR}disabled{self.CHAT_RESET_COLOR}")
 
         print()
         logger.debug(f"Displayed session info for session: {session_id}")
