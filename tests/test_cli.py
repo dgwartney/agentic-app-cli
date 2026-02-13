@@ -4,7 +4,7 @@ Unit tests for CLI.
 
 import json
 import os
-import time
+import uuid
 from io import StringIO
 from unittest.mock import Mock, patch
 
@@ -929,11 +929,15 @@ class TestChatSpecialCommands:
 
     @patch("agentic_api_cli.cli.AgenticAPIClient")
     @patch("builtins.input")
-    @patch("time.time")
-    def test_new_command_changes_session(self, mock_time, mock_input, mock_client_class, cli, mock_env):
+    @patch("uuid.uuid4")
+    def test_new_command_changes_session(self, mock_uuid, mock_input, mock_client_class, cli, mock_env):
         """Test #new command generates new session ID."""
-        # Mock time to return different values for session IDs
-        mock_time.side_effect = [1000, 2000]  # First session, then new session
+        # Mock uuid to return different values for session IDs
+        from uuid import UUID
+        mock_uuid.side_effect = [
+            UUID("12345678-1234-5678-1234-567812345678"),
+            UUID("87654321-4321-8765-4321-876543218765")
+        ]
 
         mock_input.side_effect = ["test1", "#new", "test2", "exit"]
 

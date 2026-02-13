@@ -519,16 +519,16 @@ Environment Variables:
 
     def _generate_simple_session_id(self) -> str:
         """
-        Generate simple session ID for chat.
+        Generate unique session ID for chat using UUID.
 
         Returns:
-            Session ID string with format: chat-{timestamp}
+            Session ID string with format: chat-{uuid4}
 
-        Note:
-            Task 6 will replace this with UUID-based generation.
+        Example:
+            'chat-a1b2c3d4-e5f6-4789-a0b1-c2d3e4f5g6h7'
         """
-        import time
-        return f"chat-{int(time.time())}"
+        import uuid
+        return f"chat-{uuid.uuid4()}"
 
     def _print_chat_banner(self, session_id: str, env_name: str) -> None:
         """

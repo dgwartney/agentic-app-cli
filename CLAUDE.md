@@ -92,86 +92,7 @@ The following credentials must be configured (via environment variables or confi
 
 The following features are planned for future implementation:
 
-### Task 6: Auto-generate session ID for chat command
-
-Automatically generate unique session IDs when starting chat mode if not provided by user.
-
-**Requirements:**
-- Generate unique session ID when chat command starts
-- Use format: `chat-{uuid4}` for guaranteed uniqueness
-- Allow user to override with `--session-id` option
-- Display generated session ID in welcome banner
-- Ensure session ID is consistent throughout chat session
-- Generate new session ID when #new command is used
-
-**Example implementation:**
-```python
-import uuid
-
-def generate_chat_session_id() -> str:
-    """Generate unique session ID for chat."""
-    return f"chat-{uuid.uuid4()}"
-```
-
-**CLI behavior:**
-- `chat` - Auto-generates session ID
-- `chat --session-id custom-123` - Uses provided session ID
-- Display session ID in welcome message
-- Log session ID for debugging
-
-**Implementation:**
-- Add session ID generation function to utils module
-- Update chat command to generate ID if not provided
-- Pass session ID to execute_run calls
-- Update #new command to generate new session ID
-
-**Depends on:** Task 4 (Create interactive chat command)
-
-### Task 7: Add #new command to start fresh session
-
-Implement the #new/#newsession special command to start a fresh conversation session in chat mode.
-
-**Requirements:**
-- Command aliases: `#new`, `#newsession`
-- Generates new session ID
-- Resets conversation context
-- Maintains same environment and configuration
-- Shows confirmation with new session ID
-- Clears any local conversation history tracking
-
-**Example:**
-```
-You: Tell me about quantum computing
-Agent: [Long response about quantum computing]
-
-You: #new
-╔═══════════════════════════════════════╗
-║      New Session Started              ║
-╚═══════════════════════════════════════╝
-Previous Session: chat-1234-5678
-New Session: chat-9876-5432
-
-You: Hello
-Agent: Hi! Welcome! How can I help you?
-[Agent doesn't remember quantum computing conversation]
-```
-
-**Implementation:**
-- Add #new command handler in chat special commands
-- Call generate_session_id() to create new ID
-- Update chat state with new session ID
-- Clear any conversation history tracking
-- Display banner or message confirming new session
-- Log session change for debugging
-
-**Optional enhancements:**
-- Ask for confirmation before starting new session
-- Offer to save previous session history
-- Allow naming sessions for later recall
-
-**Depends on:**
-- Task 5 (Implement special commands in chat mode)
-- Task 6 (Auto-generate session ID for chat command)
+*(No planned tasks at this time)*
 
 ## Completed Features
 
@@ -204,7 +125,7 @@ Agent: Hi! Welcome! How can I help you?
 
 ### ✅ Task 4: Create interactive chat command
 - Implemented `chat` command with interactive REPL-style interface
-- Auto-generates session ID (timestamp-based: `chat-{timestamp}`)
+- Auto-generates session ID (UUID-based: `chat-{uuid4}`) - upgraded in Task 6
 - Maintains conversation context throughout session
 - Multiple exit options: 'exit', 'quit', 'q', Ctrl+D, Ctrl+C
 - Welcome banner with session info display
@@ -227,3 +148,24 @@ Agent: Hi! Welcome! How can I help you?
 - Integration: Special command check inserted into chat loop before exit check
 - Updated welcome banner to mention '#help' for discoverability
 - ~230 lines of implementation code across dispatcher and 7 command handlers
+
+### ✅ Task 6: Auto-generate session ID for chat command
+- UUID-based session ID generation with format: `chat-{uuid4}`
+- Guaranteed uniqueness across all sessions
+- Auto-generates session ID when chat command starts (no --session-id needed)
+- User can override with `--session-id` option for custom IDs
+- Session ID displayed in welcome banner
+- Session ID consistent throughout chat session
+- #new command generates new UUID-based session ID
+- Updated from timestamp-based to UUID-based for better uniqueness guarantees
+- Test updated to mock uuid.uuid4() instead of time.time()
+
+### ✅ Task 7: Add #new command to start fresh session
+- Implemented as part of Task 5 (Special commands)
+- Command aliases: #new and #newsession
+- Generates new UUID-based session ID
+- Resets conversation context (agent doesn't remember previous conversation)
+- Maintains same environment and configuration
+- Shows confirmation banner with previous and new session IDs
+- Clears conversation history for fresh start
+- Logged for debugging purposes
