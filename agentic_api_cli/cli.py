@@ -35,26 +35,72 @@ class CLI:
         Returns:
             Configured ArgumentParser instance
         """
+        # Create parent parser with common options
+        parent_parser = argparse.ArgumentParser(add_help=False)
+        parent_parser.add_argument(
+            "--api-key",
+            help="API key (overrides KOREAI_API_KEY env var)",
+            metavar="KEY",
+        )
+        parent_parser.add_argument(
+            "--app-id",
+            help="Application ID (overrides KOREAI_APP_ID env var)",
+            metavar="ID",
+        )
+        parent_parser.add_argument(
+            "--env-name",
+            help="Environment name (overrides KOREAI_ENV_NAME env var)",
+            metavar="NAME",
+        )
+        parent_parser.add_argument(
+            "--base-url",
+            help="Base URL for API (overrides KOREAI_BASE_URL env var)",
+            metavar="URL",
+        )
+        parent_parser.add_argument(
+            "--timeout",
+            type=int,
+            help="Request timeout in seconds (overrides KOREAI_TIMEOUT env var)",
+            metavar="SECONDS",
+        )
+        parent_parser.add_argument(
+            "--env-file",
+            help="Path to .env file for configuration",
+            metavar="FILE",
+        )
+        parent_parser.add_argument(
+            "--json",
+            action="store_true",
+            help="Output in JSON format",
+        )
+        parent_parser.add_argument(
+            "--verbose",
+            "-v",
+            action="store_true",
+            help="Verbose output (show request/response details)",
+        )
+
+        # Main parser
         parser = argparse.ArgumentParser(
             prog="agentic-api-cli",
             description="Command-line interface for Kore.ai Agentic App Platform",
             formatter_class=argparse.RawDescriptionHelpFormatter,
             epilog="""
 Examples:
-  # Execute a synchronous run
+  # Execute a run
   agentic-api-cli execute --query "What is the weather?" --session-id session-001
 
-  # Execute with streaming
-  agentic-api-cli execute --query "Explain AI" --session-id session-001 --stream tokens
+  # Execute with options
+  agentic-api-cli execute --query "Explain AI" --session-id session-001 --stream tokens --debug
 
-  # Execute asynchronously
-  agentic-api-cli execute --query "Analyze data" --session-id session-001 --async
+  # Use different environment
+  agentic-api-cli execute --env-name stage --query "Test" --session-id session-001
 
   # Check run status
   agentic-api-cli status --run-id run-xyz-789
 
-  # Execute and wait for completion
-  agentic-api-cli execute --query "Process data" --session-id session-001 --async --wait
+  # Show configuration
+  agentic-api-cli config
 
 Environment Variables:
   KOREAI_API_KEY       API key for authentication (required)
@@ -65,61 +111,22 @@ Environment Variables:
             """,
         )
 
-        # Global options
         parser.add_argument(
             "--version", action="version", version=f"%(prog)s {__version__}"
         )
-        parser.add_argument(
-            "--api-key",
-            help="API key (overrides KOREAI_API_KEY env var)",
-            metavar="KEY",
-        )
-        parser.add_argument(
-            "--app-id",
-            help="Application ID (overrides KOREAI_APP_ID env var)",
-            metavar="ID",
-        )
-        parser.add_argument(
-            "--env-name",
-            help="Environment name (overrides KOREAI_ENV_NAME env var)",
-            metavar="NAME",
-        )
-        parser.add_argument(
-            "--base-url",
-            help="Base URL for API (overrides KOREAI_BASE_URL env var)",
-            metavar="URL",
-        )
-        parser.add_argument(
-            "--timeout",
-            type=int,
-            help="Request timeout in seconds (overrides KOREAI_TIMEOUT env var)",
-            metavar="SECONDS",
-        )
-        parser.add_argument(
-            "--env-file",
-            help="Path to .env file for configuration",
-            metavar="FILE",
-        )
-        parser.add_argument(
-            "--json",
-            action="store_true",
-            help="Output in JSON format",
-        )
-        parser.add_argument(
-            "--verbose",
-            "-v",
-            action="store_true",
-            help="Verbose output (show request/response details)",
-        )
 
-        # Subcommands
+        # Subcommands (command comes FIRST)
         subparsers = parser.add_subparsers(
-            dest="command", help="Available commands", required=True
+            dest="command",
+            help="Available commands",
+            required=True,
+            metavar="<command>",
         )
 
         # Execute command
         execute_parser = subparsers.add_parser(
             "execute",
+            parents=[parent_parser],
             help="Execute an agentic run",
             description="Execute an agentic app run with a query",
         )
@@ -163,6 +170,7 @@ Environment Variables:
         # Status command
         status_parser = subparsers.add_parser(
             "status",
+            parents=[parent_parser],
             help="Check run status",
             description="Check the status of an asynchronous run",
         )
@@ -196,6 +204,7 @@ Environment Variables:
         # Config command
         config_parser = subparsers.add_parser(
             "config",
+            parents=[parent_parser],
             help="Show configuration",
             description="Display current configuration (with sensitive data masked)",
         )
