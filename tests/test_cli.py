@@ -615,3 +615,232 @@ class TestClientCleanup:
             cli.run(["execute", "--session-id", "session-123", "--query", "Hello"])
 
         mock_client.close.assert_called_once()
+
+
+class TestChatCommand:
+    """Test chat command."""
+
+    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("builtins.input")
+    def test_chat_basic_conversation(self, mock_input, mock_client_class, cli, mock_env):
+        """Test basic chat conversation with exit command."""
+        # Setup mock inputs: two queries then exit
+        mock_input.side_effect = ["Hello", "How are you?", "exit"]
+
+        mock_client = Mock()
+        mock_client.execute_run.return_value = {
+            "output": [{"type": "text", "content": "I'm doing well!"}],
+            "sessionInfo": {"runId": "run-123"},
+        }
+        mock_client_class.return_value = mock_client
+
+        with patch("sys.stdout", new=StringIO()) as fake_out:
+            exit_code = cli.run(["chat"])
+
+        assert exit_code == 0
+        assert mock_client.execute_run.call_count == 2
+        output = fake_out.getvalue()
+        assert "Agentic API Chat Session Started" in output
+        assert "Goodbye!" in output
+
+    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("builtins.input")
+    def test_chat_with_quit_command(self, mock_input, mock_client_class, cli, mock_env):
+        """Test chat exits with 'quit' command."""
+        mock_input.side_effect = ["Hello", "quit"]
+
+        mock_client = Mock()
+        mock_client.execute_run.return_value = {
+            "output": [{"type": "text", "content": "Hi"}],
+            "sessionInfo": {},
+        }
+        mock_client_class.return_value = mock_client
+
+        exit_code = cli.run(["chat"])
+        assert exit_code == 0
+
+    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("builtins.input")
+    def test_chat_with_q_command(self, mock_input, mock_client_class, cli, mock_env):
+        """Test chat exits with 'q' command."""
+        mock_input.side_effect = ["test", "Q"]  # Test case insensitivity
+
+        mock_client = Mock()
+        mock_client.execute_run.return_value = {
+            "output": [{"type": "text", "content": "Response"}],
+            "sessionInfo": {},
+        }
+        mock_client_class.return_value = mock_client
+
+        exit_code = cli.run(["chat"])
+        assert exit_code == 0
+
+    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("builtins.input")
+    def test_chat_with_eof(self, mock_input, mock_client_class, cli, mock_env):
+        """Test chat handles Ctrl+D (EOFError)."""
+        mock_input.side_effect = ["Hello", EOFError()]
+
+        mock_client = Mock()
+        mock_client.execute_run.return_value = {
+            "output": [{"type": "text", "content": "Hi"}],
+            "sessionInfo": {},
+        }
+        mock_client_class.return_value = mock_client
+
+        with patch("sys.stdout", new=StringIO()) as fake_out:
+            exit_code = cli.run(["chat"])
+
+        assert exit_code == 0
+        assert "Goodbye!" in fake_out.getvalue()
+
+    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("builtins.input")
+    def test_chat_with_keyboard_interrupt(self, mock_input, mock_client_class, cli, mock_env):
+        """Test chat handles Ctrl+C (KeyboardInterrupt)."""
+        mock_input.side_effect = ["Hello", KeyboardInterrupt()]
+
+        mock_client = Mock()
+        mock_client.execute_run.return_value = {
+            "output": [{"type": "text", "content": "Hi"}],
+            "sessionInfo": {},
+        }
+        mock_client_class.return_value = mock_client
+
+        exit_code = cli.run(["chat"])
+        assert exit_code == 130
+
+    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("builtins.input")
+    def test_chat_empty_input_skipped(self, mock_input, mock_client_class, cli, mock_env):
+        """Test empty input is skipped in chat."""
+        mock_input.side_effect = ["Hello", "", "  ", "World", "exit"]
+
+        mock_client = Mock()
+        mock_client.execute_run.return_value = {
+            "output": [{"type": "text", "content": "Response"}],
+            "sessionInfo": {},
+        }
+        mock_client_class.return_value = mock_client
+
+        exit_code = cli.run(["chat"])
+
+        assert exit_code == 0
+        # Only "Hello" and "World" should trigger execute_run
+        assert mock_client.execute_run.call_count == 2
+
+    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("builtins.input")
+    def test_chat_api_error_continues(self, mock_input, mock_client_class, cli, mock_env):
+        """Test API error doesn't break chat loop."""
+        mock_input.side_effect = ["error query", "success query", "exit"]
+
+        mock_client = Mock()
+        # First call raises error, second succeeds
+        mock_client.execute_run.side_effect = [
+            AgenticAPIError("API error", status_code=500),
+            {"output": [{"type": "text", "content": "OK"}], "sessionInfo": {}},
+        ]
+        mock_client_class.return_value = mock_client
+
+        with patch("sys.stderr", new=StringIO()) as fake_err:
+            exit_code = cli.run(["chat"])
+
+        assert exit_code == 0
+        assert "API error" in fake_err.getvalue()
+        assert mock_client.execute_run.call_count == 2
+
+    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("builtins.input")
+    def test_chat_with_custom_session_id(self, mock_input, mock_client_class, cli, mock_env):
+        """Test chat uses provided session ID."""
+        mock_input.side_effect = ["Hello", "exit"]
+
+        mock_client = Mock()
+        mock_client.execute_run.return_value = {
+            "output": [{"type": "text", "content": "Hi"}],
+            "sessionInfo": {},
+        }
+        mock_client_class.return_value = mock_client
+
+        with patch("sys.stdout", new=StringIO()) as fake_out:
+            exit_code = cli.run(["chat", "--session-id", "my-custom-session"])
+
+        assert exit_code == 0
+        output = fake_out.getvalue()
+        assert "my-custom-session" in output
+
+        # Verify session ID passed to execute_run
+        call_kwargs = mock_client.execute_run.call_args[1]
+        assert call_kwargs["session_identity"] == "my-custom-session"
+
+    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("builtins.input")
+    def test_chat_with_streaming(self, mock_input, mock_client_class, cli, mock_env):
+        """Test chat passes streaming flag."""
+        mock_input.side_effect = ["Hello", "exit"]
+
+        mock_client = Mock()
+        mock_client.execute_run.return_value = {
+            "output": [{"type": "text", "content": "Hi"}],
+            "sessionInfo": {},
+        }
+        mock_client_class.return_value = mock_client
+
+        exit_code = cli.run(["chat", "--stream", "tokens"])
+
+        assert exit_code == 0
+        call_kwargs = mock_client.execute_run.call_args[1]
+        assert call_kwargs["stream_enabled"] is True
+        assert call_kwargs["stream_mode"] == "tokens"
+
+    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("builtins.input")
+    def test_chat_with_debug(self, mock_input, mock_client_class, cli, mock_env):
+        """Test chat passes debug flags."""
+        mock_input.side_effect = ["Hello", "exit"]
+
+        mock_client = Mock()
+        mock_client.execute_run.return_value = {
+            "output": [{"type": "text", "content": "Hi"}],
+            "sessionInfo": {},
+        }
+        mock_client_class.return_value = mock_client
+
+        exit_code = cli.run(["chat", "--debug", "--debug-mode", "thoughts"])
+
+        assert exit_code == 0
+        call_kwargs = mock_client.execute_run.call_args[1]
+        assert call_kwargs["debug_enabled"] is True
+        assert call_kwargs["debug_mode"] == "thoughts"
+
+    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("builtins.input")
+    def test_chat_session_id_auto_generation(self, mock_input, mock_client_class, cli, mock_env):
+        """Test chat auto-generates session ID."""
+        mock_input.side_effect = ["Hello", "exit"]
+
+        mock_client = Mock()
+        mock_client.execute_run.return_value = {
+            "output": [{"type": "text", "content": "Hi"}],
+            "sessionInfo": {},
+        }
+        mock_client_class.return_value = mock_client
+
+        with patch("sys.stdout", new=StringIO()) as fake_out:
+            exit_code = cli.run(["chat"])
+
+        assert exit_code == 0
+        output = fake_out.getvalue()
+        # Check for chat- prefix in session ID
+        assert "Session ID: chat-" in output
+
+    def test_chat_invalid_metadata_json(self, cli, mock_env):
+        """Test chat rejects invalid metadata JSON before loop."""
+        with patch("sys.stderr", new=StringIO()) as fake_err:
+            exit_code = cli.run(
+                ["chat", "--metadata", "invalid json"]
+            )
+
+        assert exit_code == 1
+        assert "Invalid JSON" in fake_err.getvalue()

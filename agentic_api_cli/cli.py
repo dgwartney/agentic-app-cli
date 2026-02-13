@@ -166,6 +166,11 @@ Examples:
   # Use different environment
   agentic-api-cli execute --env-name stage --query "Test" --session-id session-001
 
+  # Interactive chat
+  agentic-api-cli chat                           # Start chat with auto-generated session
+  agentic-api-cli chat --session-id my-session   # Start chat with specific session
+  agentic-api-cli chat --stream tokens --debug   # Chat with streaming and debug
+
   # Check run status
   agentic-api-cli status --run-id run-xyz-789
 
@@ -289,6 +294,48 @@ Environment Variables:
             parents=[parent_parser],
             help="Show configuration",
             description="Display current configuration (with sensitive data masked)",
+        )
+
+        # Chat command
+        chat_parser = subparsers.add_parser(
+            "chat",
+            parents=[parent_parser],
+            help="Start interactive chat session",
+            description="Start an interactive chat session with the agentic app",
+        )
+        chat_parser.add_argument(
+            "--session-id",
+            "-s",
+            help="Session identifier (auto-generated if not provided)",
+            metavar="ID",
+        )
+        chat_parser.add_argument(
+            "--user-id",
+            "-u",
+            help="User identifier (optional, defaults to session-id)",
+            metavar="ID",
+        )
+        chat_parser.add_argument(
+            "--stream",
+            choices=["tokens", "messages", "custom"],
+            help="Enable streaming with specified mode",
+            metavar="MODE",
+        )
+        chat_parser.add_argument(
+            "--debug",
+            action="store_true",
+            help="Enable debug mode",
+        )
+        chat_parser.add_argument(
+            "--debug-mode",
+            choices=["all", "function-call", "thoughts"],
+            help="Debug mode level (requires --debug)",
+            metavar="MODE",
+        )
+        chat_parser.add_argument(
+            "--metadata",
+            help="JSON string of metadata key-value pairs",
+            metavar="JSON",
         )
 
         # Profile command (with its own subcommands)
@@ -470,6 +517,56 @@ Environment Variables:
             if verbose:
                 print(f"\nFull Response:\n{json.dumps(data, indent=2)}")
 
+    def _generate_simple_session_id(self) -> str:
+        """
+        Generate simple session ID for chat.
+
+        Returns:
+            Session ID string with format: chat-{timestamp}
+
+        Note:
+            Task 6 will replace this with UUID-based generation.
+        """
+        import time
+        return f"chat-{int(time.time())}"
+
+    def _print_chat_banner(self, session_id: str, env_name: str) -> None:
+        """
+        Print welcome banner for chat session.
+
+        Args:
+            session_id: Session identifier
+            env_name: Environment name
+        """
+        print("╔═══════════════════════════════════════╗")
+        print("║   Agentic API Chat Session Started   ║")
+        print("╚═══════════════════════════════════════╝")
+        print(f"Session ID: {session_id}")
+        print(f"Environment: {env_name}")
+        print()
+        print("Type your message or 'exit' to quit.")
+
+    def _print_chat_response(self, data: dict, verbose: bool = False) -> None:
+        """
+        Print agent response in chat format.
+
+        Args:
+            data: Response data from API
+            verbose: Include verbose details
+        """
+        print("\nAgent: ", end="")
+
+        # Extract text content from output array
+        if "output" in data:
+            for item in data["output"]:
+                if item.get("type") == "text":
+                    print(item.get("content", ""))
+
+        # Show debug information if present and verbose
+        if "debug" in data and verbose:
+            debug_info = data["debug"]
+            print(f"\n[Debug] {json.dumps(debug_info, indent=2)}")
+
     def _handle_execute(self, args: argparse.Namespace) -> int:
         """
         Handle the execute command.
@@ -571,6 +668,105 @@ Environment Variables:
             if args.verbose and e.status_code:
                 print(f"Status Code: {e.status_code}", file=sys.stderr)
             return 1
+
+    def _handle_chat(self, args: argparse.Namespace) -> int:
+        """
+        Handle the chat command - interactive REPL-style chat.
+
+        Args:
+            args: Parsed arguments
+
+        Returns:
+            Exit code (0 for success, 130 for interrupt)
+        """
+        logger = get_logger()
+
+        # Generate or use provided session ID
+        session_id = (
+            args.session_id
+            if hasattr(args, 'session_id') and args.session_id
+            else self._generate_simple_session_id()
+        )
+
+        # Parse metadata if provided
+        metadata = None
+        if hasattr(args, 'metadata') and args.metadata:
+            try:
+                metadata = json.loads(args.metadata)
+                logger.debug(f"Parsed metadata: {metadata}")
+            except json.JSONDecodeError as e:
+                logger.error(f"Invalid JSON in --metadata: {e}")
+                print(f"Error: Invalid JSON in --metadata: {e}", file=sys.stderr)
+                return 1
+
+        # Validate debug options (same as execute command)
+        debug_mode = None
+        if hasattr(args, 'debug_mode') and args.debug_mode:
+            if not args.debug:
+                logger.error("--debug-mode requires --debug to be set")
+                print("Error: --debug-mode requires --debug flag to be set", file=sys.stderr)
+                return 1
+            debug_mode = args.debug_mode
+
+        # Display welcome banner
+        self._print_chat_banner(session_id, self.config.env_name)
+
+        logger.info(f"Starting chat session: {session_id}")
+
+        # Main chat loop
+        while True:
+            try:
+                # Get user input
+                user_input = input("\nYou: ").strip()
+
+                # Skip empty input
+                if not user_input:
+                    continue
+
+                # Check for exit commands
+                if user_input.lower() in ['exit', 'quit', 'q']:
+                    print("\nGoodbye! Session ended.")
+                    logger.info("Chat session ended by user")
+                    return 0
+
+                # Execute the query
+                logger.debug(f"Sending query: {user_input}")
+                response = self.client.execute_run(
+                    query=user_input,
+                    session_identity=session_id,
+                    user_reference=getattr(args, 'user_id', None),
+                    stream_enabled=bool(args.stream) if hasattr(args, 'stream') and args.stream else False,
+                    stream_mode=args.stream if hasattr(args, 'stream') and args.stream else None,
+                    debug_enabled=args.debug if hasattr(args, 'debug') else False,
+                    debug_mode=debug_mode,
+                    metadata=metadata,
+                )
+
+                # Display response
+                self._print_chat_response(
+                    response,
+                    verbose=args.verbose if hasattr(args, 'verbose') else False
+                )
+
+            except EOFError:
+                # Ctrl+D pressed
+                print("\n\nGoodbye! Session ended.")
+                logger.info("Chat session ended by EOF (Ctrl+D)")
+                return 0
+
+            except KeyboardInterrupt:
+                # Ctrl+C - let global handler print message
+                logger.info("Chat session interrupted by user (Ctrl+C)")
+                return 130
+
+            except AgenticAPIError as e:
+                # API errors - show error but continue chat
+                logger.error(f"API error during chat: {e.message}", exc_info=True)
+                print(f"\nError: {e.message}", file=sys.stderr)
+                if hasattr(args, 'verbose') and args.verbose and e.status_code:
+                    print(f"Status Code: {e.status_code}", file=sys.stderr)
+                # Continue loop to allow retry
+                continue
 
     def _handle_config(self, args: argparse.Namespace) -> int:
         """
@@ -837,6 +1033,8 @@ Environment Variables:
                 return self._handle_execute(args)
             elif args.command == "status":
                 return self._handle_status(args)
+            elif args.command == "chat":
+                return self._handle_chat(args)
             else:
                 print(f"Unknown command: {args.command}", file=sys.stderr)
                 return 1
