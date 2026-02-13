@@ -153,18 +153,21 @@ Examples:
   agentic-api-cli profile set-default prod       # Set default profile
   agentic-api-cli profile delete staging         # Delete a profile
 
-  # Execute with profiles
-  agentic-api-cli --profile prod execute --query "Hello" --session-id s1
-  agentic-api-cli execute --query "Test" --session-id s1  # Uses default profile
+  # Execute with auto-generated session ID
+  agentic-api-cli execute --query "Hello"
+  agentic-api-cli execute --query "What is the weather?"
 
-  # Execute a run (with environment variables or flags)
-  agentic-api-cli execute --query "What is the weather?" --session-id session-001
+  # Execute with custom session ID
+  agentic-api-cli execute --query "Test" --session-id custom-session-001
+
+  # Execute with profiles
+  agentic-api-cli --profile prod execute --query "Hello"
 
   # Execute with options
-  agentic-api-cli execute --query "Explain AI" --session-id session-001 --stream tokens --debug --debug-mode thoughts
+  agentic-api-cli execute --query "Explain AI" --stream tokens --debug --debug-mode thoughts
 
   # Use different environment
-  agentic-api-cli execute --env-name stage --query "Test" --session-id session-001
+  agentic-api-cli execute --env-name stage --query "Test"
 
   # Interactive chat
   agentic-api-cli chat                           # Start chat with auto-generated session
@@ -221,8 +224,8 @@ Environment Variables:
         execute_parser.add_argument(
             "--session-id",
             "-s",
-            required=True,
-            help="Session identifier (used as sessionReference)",
+            required=False,
+            help="Session identifier (auto-generated if not provided)",
             metavar="ID",
         )
         execute_parser.add_argument(
@@ -808,9 +811,12 @@ Environment Variables:
                     return 1
                 debug_mode = args.debug_mode
 
-            logger.info(f"Executing run with session: {args.session_id}")
+            # Generate session ID if not provided
+            session_id = args.session_id if args.session_id else self._generate_simple_session_id()
+
+            logger.info(f"Executing run with session: {session_id}")
             if args.verbose:
-                print(f"Executing run with session: {args.session_id}")
+                print(f"Executing run with session: {session_id}")
                 if hasattr(args, 'user_id') and args.user_id:
                     print(f"User ID: {args.user_id}")
                 print(f"Query: {args.query}")
@@ -818,7 +824,7 @@ Environment Variables:
             # Execute the run with actual API format
             response = self.client.execute_run(
                 query=args.query,
-                session_identity=args.session_id,
+                session_identity=session_id,
                 user_reference=getattr(args, 'user_id', None),
                 stream_enabled=bool(args.stream),
                 stream_mode=args.stream if args.stream else None,

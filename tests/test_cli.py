@@ -382,6 +382,28 @@ class TestExecuteCommand:
         assert exit_code == 1
         assert "API error" in fake_err.getvalue()
 
+    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    def test_execute_auto_generates_session_id(self, mock_client_class, cli, mock_env):
+        """Test execute command auto-generates session ID when not provided."""
+        mock_client = Mock()
+        mock_client.execute_run.return_value = {
+            "output": [{"type": "text", "content": "Hello!"}],
+            "sessionInfo": {"runId": "run-123"},
+        }
+        mock_client_class.return_value = mock_client
+
+        exit_code = cli.run(["execute", "--query", "Hello"])
+
+        assert exit_code == 0
+        # Verify execute_run was called
+        assert mock_client.execute_run.called
+        # Verify session_identity was provided (auto-generated)
+        call_kwargs = mock_client.execute_run.call_args[1]
+        session_id = call_kwargs["session_identity"]
+        # Verify it's a UUID-based session ID
+        assert session_id.startswith("chat-")
+        assert len(session_id) > 10  # UUID makes it longer than just "chat-"
+
 
 class TestStatusCommand:
     """Test status command."""

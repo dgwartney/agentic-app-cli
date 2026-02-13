@@ -73,9 +73,11 @@ Type your messages and use special commands like `#help`, `#debug on`, or `#new`
 ### 4. Or Execute a Single Query
 
 ```bash
-agentic-api-cli execute \
-  --query "Hello! How can you help me today?" \
-  --session-id my-session-001
+# Session ID auto-generated
+agentic-api-cli execute --query "Hello! How can you help me today?"
+
+# Or use a custom session ID
+agentic-api-cli execute --query "Hello!" --session-id my-session-001
 ```
 
 ### 5. View Configuration
@@ -194,23 +196,24 @@ agentic-api-cli --env-file /path/to/.env execute --query "Hello" --session-id s1
 
 ### Basic Examples
 
-Execute a run with a query:
+Execute a run with auto-generated session ID:
 ```bash
-agentic-api-cli execute --query "What is the weather in San Francisco?" --session-id session-001
+agentic-api-cli execute --query "What is the weather in San Francisco?"
+```
+
+Execute with a custom session ID:
+```bash
+agentic-api-cli execute --query "What is the weather?" --session-id my-session-001
 ```
 
 Execute using a specific profile:
 ```bash
-agentic-api-cli --profile production execute \
-  --query "Hello, how are you?" \
-  --session-id session-001
+agentic-api-cli --profile production execute --query "Hello, how are you?"
 ```
 
 Execute using the default profile:
 ```bash
-agentic-api-cli execute \
-  --query "Explain quantum computing" \
-  --session-id session-001
+agentic-api-cli execute --query "Explain quantum computing"
 ```
 
 ### Stream Responses
