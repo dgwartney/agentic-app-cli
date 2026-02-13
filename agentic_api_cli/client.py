@@ -31,6 +31,11 @@ from agentic_api_cli.exceptions import (
     TimeoutError as AgenticTimeoutError,
     ValidationError,
 )
+from agentic_api_cli.logging_config import (
+    get_logger,
+    log_api_request,
+    log_api_response,
+)
 
 
 class AgenticAPIClient:
@@ -131,10 +136,13 @@ class AgenticAPIClient:
             request_body["metaData"] = metadata
 
         # Make the request
+        log_api_request(url, "POST", request_body)
         try:
             response = self.session.post(
                 url, json=request_body, timeout=self.config.timeout
             )
+
+            log_api_response(response.status_code, response.json() if response.text else None)
 
             # Handle different HTTP status codes
             if response.status_code == 401:
@@ -193,8 +201,11 @@ class AgenticAPIClient:
         url = build_status_url(self.config.app_id, self.config.env_name, run_id)
 
         # Make the request
+        log_api_request(url, "POST", {})
         try:
             response = self.session.post(url, json={}, timeout=self.config.timeout)
+
+            log_api_response(response.status_code, response.json() if response.text else None)
 
             # Handle different HTTP status codes
             if response.status_code == 401:
@@ -242,7 +253,11 @@ class AgenticAPIClient:
             RunNotFoundError: If the run is not found
             APIResponseError: If the API returns an error status
         """
+        logger = get_logger('client')
+        logger.debug(f"Starting poll for run {run_id} (max_attempts={max_attempts}, interval={interval})")
+
         for attempt in range(max_attempts):
+            logger.debug(f"Poll attempt {attempt + 1}/{max_attempts} for run {run_id}")
             status_response = self.get_run_status(run_id)
             status = status_response.get("status")
 

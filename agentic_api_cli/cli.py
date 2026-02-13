@@ -13,6 +13,7 @@ from agentic_api_cli import __version__
 from agentic_api_cli.client import AgenticAPIClient
 from agentic_api_cli.config import Config
 from agentic_api_cli.exceptions import AgenticAPIError
+from agentic_api_cli.logging_config import setup_logging, get_logger
 
 
 class CLI:
@@ -77,7 +78,19 @@ class CLI:
             "--verbose",
             "-v",
             action="store_true",
-            help="Verbose output (show request/response details)",
+            help="Verbose output (enables DEBUG logging and shows details)",
+        )
+        parent_parser.add_argument(
+            "--log-level",
+            choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+            default="WARNING",
+            help="Set logging level (default: WARNING, --verbose sets DEBUG)",
+            metavar="LEVEL",
+        )
+        parent_parser.add_argument(
+            "--log-file",
+            help="Write logs to file (with automatic rotation at 10MB)",
+            metavar="FILE",
         )
 
         # Main parser
@@ -289,16 +302,20 @@ Environment Variables:
         Returns:
             Exit code (0 for success, 1 for error)
         """
+        logger = get_logger()
         try:
             # Parse metadata if provided
             metadata = None
             if args.metadata:
                 try:
                     metadata = json.loads(args.metadata)
+                    logger.debug(f"Parsed metadata: {metadata}")
                 except json.JSONDecodeError as e:
+                    logger.error(f"Invalid JSON in --metadata: {e}")
                     print(f"Error: Invalid JSON in --metadata: {e}", file=sys.stderr)
                     return 1
 
+            logger.info(f"Executing run with session: {args.session_id}")
             if args.verbose:
                 print(f"Executing run with session: {args.session_id}")
                 if hasattr(args, 'user_id') and args.user_id:
@@ -316,10 +333,12 @@ Environment Variables:
                 metadata=metadata,
             )
 
+            logger.info("Run execution completed successfully")
             self._print_output(response, as_json=args.json, verbose=args.verbose)
             return 0
 
         except AgenticAPIError as e:
+            logger.error(f"API error during execute: {e.message}", exc_info=True)
             print(f"Error: {e.message}", file=sys.stderr)
             if args.verbose and e.status_code:
                 print(f"Status Code: {e.status_code}", file=sys.stderr)
@@ -335,25 +354,31 @@ Environment Variables:
         Returns:
             Exit code (0 for success, 1 for error)
         """
+        logger = get_logger()
         try:
+            logger.info(f"Checking status for run: {args.run_id}")
             if args.verbose:
                 print(f"Checking status for run: {args.run_id}")
 
             if args.wait:
+                logger.debug(f"Polling for run status (max_attempts={args.max_attempts}, interval={args.poll_interval})")
                 response = self.client.poll_run_status(
                     run_id=args.run_id,
                     max_attempts=args.max_attempts,
                     interval=args.poll_interval,
                 )
+                logger.info("Run completed after polling")
                 if args.verbose:
                     print(f"Run completed after polling")
             else:
                 response = self.client.get_run_status(args.run_id)
 
+            logger.info("Status check completed successfully")
             self._print_output(response, as_json=args.json, verbose=args.verbose)
             return 0
 
         except AgenticAPIError as e:
+            logger.error(f"API error during status check: {e.message}", exc_info=True)
             print(f"Error: {e.message}", file=sys.stderr)
             if args.verbose and e.status_code:
                 print(f"Status Code: {e.status_code}", file=sys.stderr)
@@ -397,8 +422,17 @@ Environment Variables:
         try:
             args = self.parser.parse_args(argv)
 
+            # Set up logging based on arguments
+            setup_logging(
+                log_level=args.log_level,
+                log_file=args.log_file if hasattr(args, 'log_file') else None,
+                verbose=args.verbose if hasattr(args, 'verbose') else False,
+            )
+            logger = get_logger()
+
             # Load configuration
             self.config = self._load_config(args)
+            logger.debug(f"Configuration loaded for environment: {self.config.env_name}")
 
             # Handle config command separately (no client needed)
             if args.command == "config":

@@ -11,6 +11,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from agentic_api_cli.exceptions import ConfigurationError
+from agentic_api_cli.logging_config import get_logger
 
 
 class Config:
@@ -28,13 +29,17 @@ class Config:
             env_file: Path to .env file (optional). If not provided, will look for .env
                      in current directory.
         """
+        logger = get_logger('config')
+
         # Load from .env file if it exists
         if env_file:
+            logger.debug(f"Loading environment from file: {env_file}")
             load_dotenv(env_file)
         else:
             # Try to load from current directory
             env_path = Path.cwd() / ".env"
             if env_path.exists():
+                logger.debug(f"Loading environment from: {env_path}")
                 load_dotenv(env_path)
 
         # Load configuration from environment variables
@@ -43,6 +48,8 @@ class Config:
         self._env_name = os.getenv("KOREAI_ENV_NAME", "production")
         self._base_url = os.getenv("KOREAI_BASE_URL", "https://agent-platform.kore.ai/api/v2")
         self._timeout = int(os.getenv("KOREAI_TIMEOUT", "30"))
+
+        logger.debug(f"Configuration initialized: env_name={self._env_name}, base_url={self._base_url}, timeout={self._timeout}")
 
     @property
     def api_key(self) -> str:
@@ -140,9 +147,14 @@ class Config:
         Raises:
             ConfigurationError: If any required configuration is missing
         """
+        logger = get_logger('config')
+        logger.debug("Validating configuration...")
+
         # This will raise ConfigurationError if not set
         _ = self.api_key
         _ = self.app_id
+
+        logger.info("Configuration validated successfully")
 
     def __repr__(self) -> str:
         """String representation (masks sensitive data)."""
