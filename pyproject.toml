@@ -6,10 +6,10 @@ readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }
 authors = [
-    { name = "Your Name", email = "your.email@example.com" }
+    { name = "David Gwartney", email = "david.gwartney@gmail.com" }
 ]
 maintainers = [
-    { name = "Your Name", email = "your.email@example.com" }
+    { name = "David Gwartney", email = "david.gwartney@gmail.com" }
 ]
 keywords = [
     "kore.ai",
@@ -54,11 +54,11 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/agentic-app-cli"
-Documentation = "https://github.com/yourusername/agentic-app-cli#readme"
-Repository = "https://github.com/yourusername/agentic-app-cli"
-Issues = "https://github.com/yourusername/agentic-app-cli/issues"
-Changelog = "https://github.com/yourusername/agentic-app-cli/releases"
+Homepage = "https://github.com/dgwartney/agentic-app-cli"
+Documentation = "https://github.com/dgwartney/agentic-app-cli#readme"
+Repository = "https://github.com/dgwartney/agentic-app-cli"
+Issues = "https://github.com/dgwartney/agentic-app-cli/issues"
+Changelog = "https://github.com/dgwartney/agentic-app-cli/releases"
 
 [project.scripts]
 agentic-api-cli = "agentic_api_cli.cli:main"

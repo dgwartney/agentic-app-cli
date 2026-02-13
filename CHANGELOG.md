@@ -33,5 +33,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Usage examples in README
 - Development setup instructions
 
-[Unreleased]: https://github.com/yourusername/agentic-app-cli/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/yourusername/agentic-app-cli/releases/tag/v0.1.0
+[Unreleased]: https://github.com/dgwartney/agentic-app-cli/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/dgwartney/agentic-app-cli/releases/tag/v0.1.0

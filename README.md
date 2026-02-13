@@ -28,7 +28,7 @@ pip install agentic-api-cli
 ### From Source
 
 ```bash
-git clone https://github.com/yourusername/agentic-app-cli.git
+git clone https://github.com/dgwartney/agentic-app-cli.git
 cd agentic-app-cli
 uv sync
 ```
@@ -39,7 +39,7 @@ uv sync
 
 ```bash
 # From source (development)
-git clone https://github.com/yourusername/agentic-app-cli.git
+git clone https://github.com/dgwartney/agentic-app-cli.git
 cd agentic-app-cli
 uv sync
 ```
@@ -374,7 +374,7 @@ This project uses `uv` for package management.
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/agentic-app-cli.git
+git clone https://github.com/dgwartney/agentic-app-cli.git
 cd agentic-app-cli
 
 # Create virtual environment and install dependencies
@@ -459,7 +459,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## Support
 
 For issues and questions:
-- GitHub Issues: https://github.com/yourusername/agentic-app-cli/issues
+- GitHub Issues: https://github.com/dgwartney/agentic-app-cli/issues
 - Kore.ai Documentation: https://docs.kore.ai/
 
 ## Changelog
