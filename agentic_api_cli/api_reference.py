@@ -5,7 +5,9 @@ This module provides type definitions, constants, and reference documentation
 for the Kore.ai Agentic App Platform REST API.
 
 Base URL: https://agent-platform.kore.ai/api/v2
-Documentation: See memory/kore-ai-api.md for detailed API documentation
+
+NOTE: This implementation is based on the ACTUAL API format discovered through
+working curl commands, not the initial documentation which was inaccurate.
 """
 
 from enum import Enum
@@ -46,9 +48,44 @@ class RunStatus(str, Enum):
     FAILED = "failed"      # Run failed with error
 
 
+class SessionIdentityType(str, Enum):
+    """Type of session identity"""
+    USER_REFERENCE = "userReference"
+    SESSION_REFERENCE = "sessionReference"
+
+
+class InputType(str, Enum):
+    """Type of input content"""
+    TEXT = "text"
+
+
 # ============================================================================
 # Type Definitions - Request Bodies
 # ============================================================================
+
+class SessionIdentityItem(TypedDict):
+    """
+    Session identity item.
+
+    Attributes:
+        type: Type of identity (userReference or sessionReference)
+        value: The identity value
+    """
+    type: str  # "userReference" or "sessionReference"
+    value: str
+
+
+class InputItem(TypedDict):
+    """
+    Input content item.
+
+    Attributes:
+        type: Type of input (typically "text")
+        content: The actual input content
+    """
+    type: str  # "text"
+    content: str
+
 
 class FileAttachment(TypedDict, total=False):
     """
@@ -67,11 +104,11 @@ class StreamConfig(TypedDict, total=False):
     Streaming configuration for execute run.
 
     Attributes:
-        mode: Streaming mode (tokens, messages, or custom)
-        customEventNames: List of custom event names to stream (when mode is custom)
+        enable: Enable streaming (true/false)
+        streamMode: Streaming mode (tokens, messages, or custom)
     """
-    mode: Literal["tokens", "messages", "custom"]
-    customEventNames: list[str]
+    enable: bool
+    streamMode: str  # "tokens", "messages", or "custom"
 
 
 class DebugConfig(TypedDict, total=False):
@@ -79,51 +116,29 @@ class DebugConfig(TypedDict, total=False):
     Debug configuration for execute run.
 
     Attributes:
-        mode: Debug verbosity level (all, summary, or off)
-        streamDebugData: Whether to stream debug data in real-time
+        enable: Enable debug mode (true/false)
     """
-    mode: Literal["all", "summary", "off"]
-    streamDebugData: bool
-
-
-class AgentSpecificInput(TypedDict):
-    """
-    Direct agent invocation input.
-
-    Attributes:
-        agentId: ID of the specific agent to invoke
-        input: Input text for the agent
-    """
-    agentId: str
-    input: str
+    enable: bool
 
 
 class ExecuteRunRequest(TypedDict, total=False):
     """
     Request body for POST /apps/<AppID>/environments/<EnvName>/runs/execute
 
+    ACTUAL API FORMAT (different from initial documentation):
+
     Attributes:
-        sessionIdentity: Unique session identifier for conversation continuity (required)
-        async: Execute asynchronously (default: false)
-        query: User query/input (required unless agentSpecificInput provided)
-        stream: Streaming configuration
-        debug: Debug configuration
-        files: Array of file attachments
+        sessionIdentity: Array of session identity objects with type and value
+        input: Array of input objects with type and content
+        stream: Streaming configuration with enable and streamMode
+        debug: Debug configuration with enable flag
         metaData: Custom metadata key-value pairs
-        agentSpecificInput: Direct agent invocation
-        triggerToolIds: Specific tool IDs to trigger
-        skipCache: Bypass cache for fresh responses (default: false)
     """
-    sessionIdentity: str  # Required
-    async_: bool  # Using async_ to avoid Python keyword conflict
-    query: str
+    sessionIdentity: list[SessionIdentityItem]  # Required
+    input: list[InputItem]  # Required
     stream: StreamConfig
     debug: DebugConfig
-    files: list[FileAttachment]
     metaData: dict[str, Any]
-    agentSpecificInput: AgentSpecificInput
-    triggerToolIds: list[str]
-    skipCache: bool
 
 
 class FindRunStatusRequest(TypedDict, total=False):
@@ -245,7 +260,7 @@ def build_execute_url(app_id: str, env_name: str) -> str:
 
     Args:
         app_id: Unique identifier for the agentic application
-        env_name: Environment name (e.g., "production", "staging")
+        env_name: Environment name (e.g., "production", "staging", "draft")
 
     Returns:
         Full URL for execute run endpoint
@@ -263,7 +278,7 @@ def build_status_url(app_id: str, env_name: str, run_id: str) -> str:
 
     Args:
         app_id: Unique identifier for the agentic application
-        env_name: Environment name (e.g., "production", "staging")
+        env_name: Environment name (e.g., "production", "staging", "draft")
         run_id: Run ID to check status for
 
     Returns:
@@ -302,48 +317,108 @@ def build_headers(api_key: str) -> dict[str, str]:
 
 
 # ============================================================================
+# Helper Functions
+# ============================================================================
+
+def build_session_identity(user_ref: str, session_ref: Optional[str] = None) -> list[SessionIdentityItem]:
+    """
+    Build sessionIdentity array from user and session references.
+
+    Args:
+        user_ref: User reference value
+        session_ref: Session reference value (optional)
+
+    Returns:
+        List of session identity items
+
+    Example:
+        >>> build_session_identity("user-123", "session-456")
+        [
+            {'type': 'userReference', 'value': 'user-123'},
+            {'type': 'sessionReference', 'value': 'session-456'}
+        ]
+    """
+    identity: list[SessionIdentityItem] = [
+        {
+            "type": SessionIdentityType.USER_REFERENCE.value,
+            "value": user_ref
+        }
+    ]
+
+    if session_ref:
+        identity.append({
+            "type": SessionIdentityType.SESSION_REFERENCE.value,
+            "value": session_ref
+        })
+
+    return identity
+
+
+def build_input(text: str) -> list[InputItem]:
+    """
+    Build input array from text content.
+
+    Args:
+        text: Input text content
+
+    Returns:
+        List of input items
+
+    Example:
+        >>> build_input("Hello world")
+        [{'type': 'text', 'content': 'Hello world'}]
+    """
+    return [
+        {
+            "type": InputType.TEXT.value,
+            "content": text
+        }
+    ]
+
+
+# ============================================================================
 # Usage Examples (for reference)
 # ============================================================================
 
 # Example 1: Basic synchronous request
 EXAMPLE_SYNC_REQUEST: ExecuteRunRequest = {
-    "sessionIdentity": "user-session-001",
-    "query": "What is the weather in San Francisco?"
+    "sessionIdentity": [
+        {"type": "userReference", "value": "user-001"},
+        {"type": "sessionReference", "value": "session-001"}
+    ],
+    "input": [
+        {"type": "text", "content": "What is the weather in San Francisco?"}
+    ]
 }
 
 # Example 2: Streaming request with debug
 EXAMPLE_STREAM_REQUEST: ExecuteRunRequest = {
-    "sessionIdentity": "user-session-002",
-    "query": "Explain quantum computing",
+    "sessionIdentity": [
+        {"type": "userReference", "value": "user-002"},
+        {"type": "sessionReference", "value": "session-002"}
+    ],
+    "input": [
+        {"type": "text", "content": "Explain quantum computing"}
+    ],
     "stream": {
-        "mode": "tokens"
+        "enable": True,
+        "streamMode": "tokens"
     },
     "debug": {
-        "mode": "all",
-        "streamDebugData": True
+        "enable": True
     }
 }
 
-# Example 3: Asynchronous request with metadata
-EXAMPLE_ASYNC_REQUEST: ExecuteRunRequest = {
-    "sessionIdentity": "user-session-003",
-    "async_": True,
-    "query": "Analyze this large dataset",
+# Example 3: Request with metadata
+EXAMPLE_METADATA_REQUEST: ExecuteRunRequest = {
+    "sessionIdentity": [
+        {"type": "userReference", "value": "user-003"}
+    ],
+    "input": [
+        {"type": "text", "content": "Analyze this data"}
+    ],
     "metaData": {
         "userId": "user-123",
         "requestSource": "cli"
-    },
-    "skipCache": True
-}
-
-# Example 4: Request with file attachments
-EXAMPLE_FILE_REQUEST: ExecuteRunRequest = {
-    "sessionIdentity": "user-session-004",
-    "query": "Analyze this document",
-    "files": [
-        {
-            "fileUrl": "https://example.com/document.pdf",
-            "fileName": "document.pdf"
-        }
-    ]
+    }
 }

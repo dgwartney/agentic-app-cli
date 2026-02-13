@@ -1,7 +1,8 @@
 """
 API client for Kore.ai Agentic App Platform.
 
-Provides a class-based interface for making API requests.
+Provides a class-based interface for making API requests using the ACTUAL
+API format (not the initially documented format which was inaccurate).
 """
 
 import time
@@ -17,6 +18,8 @@ from agentic_api_cli.api_reference import (
     StreamMode,
     build_execute_url,
     build_headers,
+    build_input,
+    build_session_identity,
     build_status_url,
 )
 from agentic_api_cli.config import Config
@@ -34,7 +37,7 @@ class AgenticAPIClient:
     """
     Client for Kore.ai Agentic App Platform API.
 
-    Handles all API interactions including execute run and status checking.
+    Handles all API interactions using the actual API format.
     """
 
     def __init__(self, config: Config) -> None:
@@ -52,27 +55,23 @@ class AgenticAPIClient:
         self,
         query: str,
         session_identity: str,
-        async_mode: bool = False,
+        user_reference: Optional[str] = None,
+        stream_enabled: bool = False,
         stream_mode: Optional[str] = None,
-        debug_mode: str = "off",
-        stream_debug: bool = False,
-        files: Optional[list[dict[str, str]]] = None,
+        debug_enabled: bool = False,
         metadata: Optional[dict[str, Any]] = None,
-        skip_cache: bool = False,
     ) -> dict[str, Any]:
         """
         Execute an agentic run.
 
         Args:
-            query: User query/input
-            session_identity: Unique session identifier
-            async_mode: Execute asynchronously (default: False)
-            stream_mode: Streaming mode ('tokens', 'messages', 'custom', or None)
-            debug_mode: Debug level ('all', 'summary', 'off')
-            stream_debug: Stream debug data in real-time
-            files: List of file attachments with 'fileUrl' and 'fileName'
+            query: User query/input text
+            session_identity: Session identifier (used as sessionReference)
+            user_reference: User identifier (optional, uses session_identity if not provided)
+            stream_enabled: Enable streaming
+            stream_mode: Streaming mode ('tokens', 'messages', or 'custom')
+            debug_enabled: Enable debug mode
             metadata: Custom metadata dictionary
-            skip_cache: Bypass cache for fresh responses
 
         Returns:
             Response dictionary from the API
@@ -96,40 +95,40 @@ class AgenticAPIClient:
                 f"Invalid stream mode: {stream_mode}. Must be 'tokens', 'messages', or 'custom'"
             )
 
-        if debug_mode not in ["all", "summary", "off"]:
-            raise ValidationError(
-                f"Invalid debug mode: {debug_mode}. Must be 'all', 'summary', or 'off'"
-            )
-
         # Build request URL
         url = build_execute_url(self.config.app_id, self.config.env_name)
 
-        # Build request body
+        # Build sessionIdentity array
+        # If user_reference not provided, use session_identity for both
+        user_ref = user_reference if user_reference else session_identity
+        session_id_array = build_session_identity(user_ref, session_identity)
+
+        # Build input array
+        input_array = build_input(query)
+
+        # Build request body with actual API format
         request_body: dict[str, Any] = {
-            "sessionIdentity": session_identity,
-            "query": query,
+            "sessionIdentity": session_id_array,
+            "input": input_array,
         }
 
-        if async_mode:
-            request_body["async"] = True
+        # Add streaming config if enabled
+        if stream_enabled or stream_mode:
+            request_body["stream"] = {
+                "enable": stream_enabled,
+            }
+            if stream_mode:
+                request_body["stream"]["streamMode"] = stream_mode
 
-        if stream_mode:
-            request_body["stream"] = {"mode": stream_mode}
-
-        if debug_mode != "off" or stream_debug:
+        # Add debug config if enabled
+        if debug_enabled:
             request_body["debug"] = {
-                "mode": debug_mode,
-                "streamDebugData": stream_debug,
+                "enable": True
             }
 
-        if files:
-            request_body["files"] = files
-
+        # Add metadata if provided
         if metadata:
             request_body["metaData"] = metadata
-
-        if skip_cache:
-            request_body["skipCache"] = True
 
         # Make the request
         try:
@@ -268,45 +267,6 @@ class AgenticAPIClient:
         raise AgenticTimeoutError(
             f"Run did not complete after {max_attempts * interval} seconds"
         )
-
-    def execute_and_wait(
-        self,
-        query: str,
-        session_identity: str,
-        max_attempts: int = 30,
-        interval: int = 2,
-        **kwargs: Any,
-    ) -> dict[str, Any]:
-        """
-        Execute a run asynchronously and wait for completion.
-
-        Convenience method that combines execute_run with async=True and poll_run_status.
-
-        Args:
-            query: User query/input
-            session_identity: Unique session identifier
-            max_attempts: Maximum polling attempts
-            interval: Seconds between polls
-            **kwargs: Additional arguments for execute_run
-
-        Returns:
-            Final status response when run completes
-
-        Raises:
-            Same exceptions as execute_run and poll_run_status
-        """
-        # Force async mode
-        kwargs["async_mode"] = True
-
-        # Execute the run
-        execute_response = self.execute_run(query, session_identity, **kwargs)
-        run_id = execute_response.get("runId")
-
-        if not run_id:
-            raise APIResponseError("No run ID returned from execute request")
-
-        # Poll for status
-        return self.poll_run_status(run_id, max_attempts, interval)
 
     def close(self) -> None:
         """Close the session and clean up resources."""

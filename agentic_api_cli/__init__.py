@@ -12,10 +12,14 @@ __email__ = "your.email@example.com"
 from agentic_api_cli.api_reference import (
     BASE_URL,
     DebugMode,
+    InputType,
     RunStatus,
+    SessionIdentityType,
     StreamMode,
     build_execute_url,
     build_headers,
+    build_input,
+    build_session_identity,
     build_status_url,
 )
 from agentic_api_cli.client import AgenticAPIClient

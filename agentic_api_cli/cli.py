@@ -134,61 +134,30 @@ Environment Variables:
             "--session-id",
             "-s",
             required=True,
-            help="Session identity for conversation continuity",
+            help="Session identifier (used as sessionReference)",
             metavar="ID",
         )
         execute_parser.add_argument(
-            "--async",
-            dest="async_mode",
-            action="store_true",
-            help="Execute asynchronously (returns immediately with run ID)",
+            "--user-id",
+            "-u",
+            help="User identifier (optional, defaults to session-id)",
+            metavar="ID",
         )
         execute_parser.add_argument(
             "--stream",
             choices=["tokens", "messages", "custom"],
-            help="Enable streaming mode",
+            help="Enable streaming with specified mode",
             metavar="MODE",
         )
         execute_parser.add_argument(
             "--debug",
-            choices=["all", "summary", "off"],
-            default="off",
-            help="Debug mode (default: off)",
-            metavar="LEVEL",
-        )
-        execute_parser.add_argument(
-            "--stream-debug",
             action="store_true",
-            help="Stream debug data in real-time",
-        )
-        execute_parser.add_argument(
-            "--skip-cache",
-            action="store_true",
-            help="Bypass cache for fresh responses",
+            help="Enable debug mode",
         )
         execute_parser.add_argument(
             "--metadata",
             help="JSON string of metadata key-value pairs",
             metavar="JSON",
-        )
-        execute_parser.add_argument(
-            "--wait",
-            action="store_true",
-            help="Wait for async run to complete (implies --async)",
-        )
-        execute_parser.add_argument(
-            "--poll-interval",
-            type=int,
-            default=2,
-            help="Polling interval in seconds when waiting (default: 2)",
-            metavar="SECONDS",
-        )
-        execute_parser.add_argument(
-            "--max-attempts",
-            type=int,
-            default=30,
-            help="Maximum polling attempts when waiting (default: 30)",
-            metavar="N",
         )
 
         # Status command
@@ -309,34 +278,20 @@ Environment Variables:
 
             if args.verbose:
                 print(f"Executing run with session: {args.session_id}")
+                if hasattr(args, 'user_id') and args.user_id:
+                    print(f"User ID: {args.user_id}")
                 print(f"Query: {args.query}")
 
-            # Execute with wait if requested
-            if args.wait:
-                response = self.client.execute_and_wait(
-                    query=args.query,
-                    session_identity=args.session_id,
-                    stream_mode=args.stream,
-                    debug_mode=args.debug,
-                    stream_debug=args.stream_debug,
-                    metadata=metadata,
-                    skip_cache=args.skip_cache,
-                    max_attempts=args.max_attempts,
-                    interval=args.poll_interval,
-                )
-                if args.verbose:
-                    print(f"Run completed after polling")
-            else:
-                response = self.client.execute_run(
-                    query=args.query,
-                    session_identity=args.session_id,
-                    async_mode=args.async_mode,
-                    stream_mode=args.stream,
-                    debug_mode=args.debug,
-                    stream_debug=args.stream_debug,
-                    metadata=metadata,
-                    skip_cache=args.skip_cache,
-                )
+            # Execute the run with actual API format
+            response = self.client.execute_run(
+                query=args.query,
+                session_identity=args.session_id,
+                user_reference=getattr(args, 'user_id', None),
+                stream_enabled=bool(args.stream),
+                stream_mode=args.stream if args.stream else None,
+                debug_enabled=args.debug if hasattr(args, 'debug') else False,
+                metadata=metadata,
+            )
 
             self._print_output(response, as_json=args.json, verbose=args.verbose)
             return 0
