@@ -1,0 +1,14 @@
+# Include documentation and license files
+include README.md
+include LICENSE
+include CHANGELOG.md
+
+# Include type information
+include agentic_api_cli/py.typed
+
+# Exclude unnecessary files from distribution
+global-exclude __pycache__
+global-exclude *.py[co]
+global-exclude .DS_Store
+global-exclude *.swp
+global-exclude *.swo
