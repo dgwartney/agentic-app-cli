@@ -11,16 +11,29 @@ __email__ = "your.email@example.com"
 
 from agentic_api_cli.api_reference import (
     BASE_URL,
-    StreamMode,
     DebugMode,
     RunStatus,
+    StreamMode,
     build_execute_url,
-    build_status_url,
     build_headers,
+    build_status_url,
+)
+from agentic_api_cli.client import AgenticAPIClient
+from agentic_api_cli.config import Config
+from agentic_api_cli.exceptions import (
+    AgenticAPIError,
+    APIRequestError,
+    APIResponseError,
+    AuthenticationError,
+    ConfigurationError,
+    RunNotFoundError,
+    TimeoutError,
+    ValidationError,
 )
 
 __all__ = [
     "__version__",
+    # API Reference
     "BASE_URL",
     "StreamMode",
     "DebugMode",
@@ -28,4 +41,16 @@ __all__ = [
     "build_execute_url",
     "build_status_url",
     "build_headers",
+    # Core Classes
+    "Config",
+    "AgenticAPIClient",
+    # Exceptions
+    "AgenticAPIError",
+    "AuthenticationError",
+    "ConfigurationError",
+    "APIRequestError",
+    "APIResponseError",
+    "TimeoutError",
+    "RunNotFoundError",
+    "ValidationError",
 ]
