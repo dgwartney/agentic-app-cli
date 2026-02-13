@@ -70,11 +70,14 @@ class AgenticAPIClient:
         """
         Execute an agentic run.
 
+        NOTE: The execute endpoint does NOT support async execution.
+        The "async" parameter is rejected by the API with a 400 error.
+
         Args:
             query: User query/input text
             session_identity: Session identifier (used as sessionReference)
             user_reference: User identifier (optional, uses session_identity if not provided)
-            stream_enabled: Enable streaming
+            stream_enabled: Enable streaming (status updates via SSE, not content)
             stream_mode: Streaming mode ('tokens', 'messages', or 'custom')
             debug_enabled: Enable debug mode
             debug_mode: Debug mode level ('all', 'function-call', or 'thoughts')

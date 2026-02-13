@@ -66,7 +66,7 @@ This CLI tool integrates with the Kore.ai Agentic App Platform API to execute an
 - **Base URL**: `https://agent-platform.kore.ai/api/v2`
 - **Authentication**: API key via `x-api-key` header
 - **Session Identity**: Maintains conversation continuity across requests
-- **Execution Modes**: Synchronous (default) or asynchronous
+- **Execution Modes**: Synchronous only (async parameter not supported by execute endpoint)
 - **Streaming**: Status streaming via SSE (Server-Sent Events)
   - **Note**: Current implementation streams status updates (busy → idle), not content
   - Content is retrieved from Find Run Status endpoint after execution completes
@@ -143,6 +143,16 @@ This **IS** like:
 - `custom`: Custom event streaming for status updates
 
 **Recommendation**: For most use cases, regular synchronous mode (`stream.enable=false`) is simpler and equivalent since content isn't streamed anyway.
+
+#### Testing Results
+
+**Async Mode Test** (2026-02-12):
+- ❌ Tested `async: true` parameter → API returns 400 error "property async should not exist"
+- ❌ Execute endpoint does NOT support async execution
+- ❌ Cannot enable true content streaming via async mode
+- ✅ Confirms streaming only provides status updates, not content
+
+**Conclusion**: The API does not support real-time content streaming in any configuration.
 
 ## Planned Features & Tasks
 
