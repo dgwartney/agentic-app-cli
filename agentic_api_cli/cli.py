@@ -130,6 +130,29 @@ class CLI:
     # INFO_ENABLED_COLOR = '\033[92m'         # Green
     # INFO_DISABLED_COLOR = '\033[2m'         # Dim
 
+    # ───────────────────────────────────────────────────────────────────
+    # Banner Color Configuration (for startup & #new command)
+    # ───────────────────────────────────────────────────────────────────
+    BANNER_BOX_COLOR = '\033[96m'           # Bright cyan for box characters ╔═╗║╚╝
+    BANNER_TEXT_COLOR = '\033[1m\033[97m'   # Bold bright white for text inside
+    BANNER_LABEL_COLOR = '\033[36m'         # Dim cyan for "Session ID:", "Environment:"
+    BANNER_VALUE_COLOR = '\033[97m'         # Bright white for session ID value
+    BANNER_ENV_COLOR = '\033[93m'           # Bright yellow for environment (highlighted)
+    #
+    # Alternative schemes (uncomment to use):
+    #
+    # Option 2: Green & Bold White
+    # BANNER_BOX_COLOR = '\033[92m'           # Bright green
+    # BANNER_TEXT_COLOR = '\033[1m\033[97m'   # Bold white
+    #
+    # Option 3: Magenta & Bold White (vibrant)
+    # BANNER_BOX_COLOR = '\033[95m'           # Bright magenta
+    # BANNER_TEXT_COLOR = '\033[1m\033[97m'   # Bold white
+    #
+    # Option 4: Bold Cyan (all bold)
+    # BANNER_BOX_COLOR = '\033[1m\033[96m'    # Bold cyan
+    # BANNER_TEXT_COLOR = '\033[1m\033[96m'   # Bold cyan
+
     CHAT_RESET_COLOR = '\033[0m'   # Reset color (don't change this)
 
     def __init__(self) -> None:
@@ -610,11 +633,14 @@ Environment Variables:
             session_id: Session identifier
             env_name: Environment name
         """
-        print("╔═══════════════════════════════════════╗")
-        print("║   Agentic API Chat Session Started    ║")
-        print("╚═══════════════════════════════════════╝")
-        print(f"Session ID: {session_id}")
-        print(f"Environment: {env_name}")
+        # Colorized banner box
+        print(f"{self.BANNER_BOX_COLOR}╔═══════════════════════════════════════╗{self.CHAT_RESET_COLOR}")
+        print(f"{self.BANNER_BOX_COLOR}║{self.CHAT_RESET_COLOR}   {self.BANNER_TEXT_COLOR}Agentic API Chat Session Started{self.CHAT_RESET_COLOR}    {self.BANNER_BOX_COLOR}║{self.CHAT_RESET_COLOR}")
+        print(f"{self.BANNER_BOX_COLOR}╚═══════════════════════════════════════╝{self.CHAT_RESET_COLOR}")
+
+        # Session info with colors
+        print(f"{self.BANNER_LABEL_COLOR}Session ID:{self.CHAT_RESET_COLOR} {self.BANNER_VALUE_COLOR}{session_id}{self.CHAT_RESET_COLOR}")
+        print(f"{self.BANNER_LABEL_COLOR}Environment:{self.CHAT_RESET_COLOR} {self.BANNER_ENV_COLOR}{env_name}{self.CHAT_RESET_COLOR}")
         print()
         print("Type your message or 'exit' to quit. Type '#help' for commands.")
 
@@ -776,11 +802,11 @@ Environment Variables:
         new_session_id = self._generate_simple_session_id()
 
         # Display banner
-        print("\n╔═══════════════════════════════════════╗")
-        print("║         New Session Started           ║")
-        print("╚═══════════════════════════════════════╝")
-        print(f"Previous Session: {session_id}")
-        print(f"New Session: {new_session_id}")
+        print(f"\n{self.BANNER_BOX_COLOR}╔═══════════════════════════════════════╗{self.CHAT_RESET_COLOR}")
+        print(f"{self.BANNER_BOX_COLOR}║{self.CHAT_RESET_COLOR}         {self.BANNER_TEXT_COLOR}New Session Started{self.CHAT_RESET_COLOR}           {self.BANNER_BOX_COLOR}║{self.CHAT_RESET_COLOR}")
+        print(f"{self.BANNER_BOX_COLOR}╚═══════════════════════════════════════╝{self.CHAT_RESET_COLOR}")
+        print(f"{self.BANNER_LABEL_COLOR}Previous Session:{self.CHAT_RESET_COLOR} {self.BANNER_VALUE_COLOR}{session_id}{self.CHAT_RESET_COLOR}")
+        print(f"{self.BANNER_LABEL_COLOR}New Session:{self.CHAT_RESET_COLOR} {self.BANNER_VALUE_COLOR}{new_session_id}{self.CHAT_RESET_COLOR}")
         print()
 
         logger.info(f"New session started. Old: {session_id}, New: {new_session_id}")

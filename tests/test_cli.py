@@ -856,8 +856,8 @@ class TestChatCommand:
 
         assert exit_code == 0
         output = fake_out.getvalue()
-        # Check for chat- prefix in session ID
-        assert "Session ID: chat-" in output
+        # Check for chat- prefix in session ID (with color codes)
+        assert "Session ID:" in output and "chat-" in output
 
     def test_chat_invalid_metadata_json(self, cli, mock_env):
         """Test chat rejects invalid metadata JSON before loop."""
