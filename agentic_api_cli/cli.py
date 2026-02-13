@@ -70,6 +70,11 @@ class CLI:
             metavar="FILE",
         )
         parent_parser.add_argument(
+            "--profile",
+            help="Profile name to use for configuration",
+            metavar="NAME",
+        )
+        parent_parser.add_argument(
             "--json",
             action="store_true",
             help="Output in JSON format",
@@ -100,7 +105,19 @@ class CLI:
             formatter_class=argparse.RawDescriptionHelpFormatter,
             epilog="""
 Examples:
-  # Execute a run
+  # Profile management
+  agentic-api-cli profile add                    # Add profile interactively
+  agentic-api-cli profile add --name prod --api-key kg-... --app-id aa-...
+  agentic-api-cli profile list                   # List all profiles
+  agentic-api-cli profile list --show-keys       # Show full API keys
+  agentic-api-cli profile set-default prod       # Set default profile
+  agentic-api-cli profile delete staging         # Delete a profile
+
+  # Execute with profiles
+  agentic-api-cli --profile prod execute --query "Hello" --session-id s1
+  agentic-api-cli execute --query "Test" --session-id s1  # Uses default profile
+
+  # Execute a run (with environment variables or flags)
   agentic-api-cli execute --query "What is the weather?" --session-id session-001
 
   # Execute with options
@@ -115,9 +132,15 @@ Examples:
   # Show configuration
   agentic-api-cli config
 
+Configuration Precedence (highest to lowest):
+  1. Command-line arguments (--api-key, --app-id, etc.)
+  2. Environment variables (KOREAI_API_KEY, KOREAI_APP_ID, etc.)
+  3. Profile values (from --profile or default profile)
+  4. Built-in defaults
+
 Environment Variables:
-  KOREAI_API_KEY       API key for authentication (required)
-  KOREAI_APP_ID        Application ID (required)
+  KOREAI_API_KEY       API key for authentication (required if no profile)
+  KOREAI_APP_ID        Application ID (required if no profile)
   KOREAI_ENV_NAME      Environment name (default: production)
   KOREAI_BASE_URL      Base URL for API (default: https://agent-platform.kore.ai/api/v2)
   KOREAI_TIMEOUT       Request timeout in seconds (default: 30)
@@ -222,11 +245,96 @@ Environment Variables:
             description="Display current configuration (with sensitive data masked)",
         )
 
+        # Profile command (with its own subcommands)
+        profile_parser = subparsers.add_parser(
+            "profile",
+            help="Manage configuration profiles",
+            description="Add, list, delete, and manage configuration profiles",
+        )
+
+        profile_subparsers = profile_parser.add_subparsers(
+            dest="profile_command",
+            help="Profile operations",
+            required=True,
+        )
+
+        # profile add
+        add_profile_parser = profile_subparsers.add_parser(
+            "add",
+            help="Add a new profile",
+            description="Add or update a configuration profile",
+        )
+        add_profile_parser.add_argument(
+            "--name",
+            help="Profile name",
+        )
+        add_profile_parser.add_argument(
+            "--api-key",
+            help="API key",
+        )
+        add_profile_parser.add_argument(
+            "--app-id",
+            help="App ID",
+        )
+        add_profile_parser.add_argument(
+            "--env-name",
+            help="Environment name (default: production)",
+        )
+        add_profile_parser.add_argument(
+            "--base-url",
+            help="Base URL (default: https://agent-platform.kore.ai/api/v2)",
+        )
+        add_profile_parser.add_argument(
+            "--timeout",
+            type=int,
+            help="Timeout in seconds (default: 30)",
+        )
+
+        # profile list
+        list_profile_parser = profile_subparsers.add_parser(
+            "list",
+            help="List all profiles",
+            description="List all configuration profiles",
+        )
+        list_profile_parser.add_argument(
+            "--show-keys",
+            action="store_true",
+            help="Show full API keys (default: masked)",
+        )
+
+        # profile delete
+        delete_profile_parser = profile_subparsers.add_parser(
+            "delete",
+            help="Delete a profile",
+            description="Delete a configuration profile",
+        )
+        delete_profile_parser.add_argument(
+            "name",
+            help="Profile name to delete",
+        )
+
+        # profile set-default
+        set_default_parser = profile_subparsers.add_parser(
+            "set-default",
+            help="Set default profile",
+            description="Set the default profile to use when --profile is not specified",
+        )
+        set_default_parser.add_argument(
+            "name",
+            help="Profile name to set as default",
+        )
+
         return parser
 
     def _load_config(self, args: argparse.Namespace) -> Config:
         """
         Load configuration from environment and command-line arguments.
+
+        Configuration precedence (highest to lowest):
+        1. Command-line arguments
+        2. Environment variables
+        3. Profile values
+        4. Built-in defaults
 
         Args:
             args: Parsed command-line arguments
@@ -234,18 +342,29 @@ Environment Variables:
         Returns:
             Configured Config instance
         """
-        config = Config(env_file=args.env_file)
+        # Determine profile to use (explicit --profile or default)
+        profile_name = None
+        if hasattr(args, 'profile') and args.profile:
+            profile_name = args.profile
+        else:
+            # Check for default profile
+            from agentic_api_cli.profiles import ProfileManager
+            manager = ProfileManager()
+            profile_name = manager.get_default_profile()
 
-        # Override with command-line arguments if provided
-        if args.api_key:
+        # Create config with profile
+        config = Config(env_file=getattr(args, 'env_file', None), profile=profile_name)
+
+        # Override with command-line arguments if provided (highest precedence)
+        if hasattr(args, 'api_key') and args.api_key:
             config.api_key = args.api_key
-        if args.app_id:
+        if hasattr(args, 'app_id') and args.app_id:
             config.app_id = args.app_id
-        if args.env_name:
+        if hasattr(args, 'env_name') and args.env_name:
             config.env_name = args.env_name
-        if args.base_url:
+        if hasattr(args, 'base_url') and args.base_url:
             config.base_url = args.base_url
-        if args.timeout:
+        if hasattr(args, 'timeout') and args.timeout:
             config.timeout = args.timeout
 
         return config
@@ -409,6 +528,181 @@ Environment Variables:
 
         return 0
 
+    def _handle_profile(self, args: argparse.Namespace) -> int:
+        """
+        Handle profile subcommands.
+
+        Args:
+            args: Parsed arguments
+
+        Returns:
+            Exit code (0 for success, 1 for error)
+        """
+        from agentic_api_cli.profiles import ProfileManager
+
+        manager = ProfileManager()
+
+        try:
+            if args.profile_command == "add":
+                return self._handle_profile_add(args, manager)
+            elif args.profile_command == "list":
+                return self._handle_profile_list(args, manager)
+            elif args.profile_command == "delete":
+                return self._handle_profile_delete(args, manager)
+            elif args.profile_command == "set-default":
+                return self._handle_profile_set_default(args, manager)
+            else:
+                print(f"Unknown profile command: {args.profile_command}", file=sys.stderr)
+                return 1
+        except AgenticAPIError as e:
+            print(f"Error: {e.message}", file=sys.stderr)
+            return 1
+        except Exception as e:
+            print(f"Error: {e}", file=sys.stderr)
+            return 1
+
+    def _handle_profile_add(self, args: argparse.Namespace, manager) -> int:
+        """
+        Handle profile add command.
+
+        Args:
+            args: Parsed arguments
+            manager: ProfileManager instance
+
+        Returns:
+            Exit code (0 for success, 1 for error)
+        """
+        # Interactive mode if name not provided
+        if not args.name:
+            print("Create a new profile")
+            print()
+            name = input("Profile name: ").strip()
+            if not name:
+                print("Error: Profile name cannot be empty", file=sys.stderr)
+                return 1
+            api_key = input("API Key: ").strip()
+            app_id = input("App ID: ").strip()
+            env_name = input("Environment name [production]: ").strip() or "production"
+            base_url = input("Base URL [https://agent-platform.kore.ai/api/v2]: ").strip() or "https://agent-platform.kore.ai/api/v2"
+            timeout_str = input("Timeout [30]: ").strip() or "30"
+            try:
+                timeout = int(timeout_str)
+            except ValueError:
+                print(f"Error: Invalid timeout value: {timeout_str}", file=sys.stderr)
+                return 1
+        else:
+            # Use command-line arguments, prompting for missing required fields
+            name = args.name.strip()
+            if not name:
+                print("Error: Profile name cannot be empty", file=sys.stderr)
+                return 1
+
+            api_key = args.api_key
+            if not api_key:
+                api_key = input("API Key: ").strip()
+
+            app_id = args.app_id
+            if not app_id:
+                app_id = input("App ID: ").strip()
+
+            env_name = args.env_name or "production"
+            base_url = args.base_url or "https://agent-platform.kore.ai/api/v2"
+            timeout = args.timeout or 30
+
+        # Check if overwriting existing profile
+        profiles = manager.load_profiles()
+        if name in profiles:
+            response = input(f"Profile '{name}' already exists. Overwrite? [y/N]: ").strip().lower()
+            if response not in ['y', 'yes']:
+                print("Cancelled")
+                return 0
+
+        manager.add_profile(name, api_key, app_id, env_name, base_url, timeout)
+        print(f"Profile '{name}' saved successfully!")
+        return 0
+
+    def _handle_profile_list(self, args: argparse.Namespace, manager) -> int:
+        """
+        Handle profile list command.
+
+        Args:
+            args: Parsed arguments
+            manager: ProfileManager instance
+
+        Returns:
+            Exit code (0 for success, 1 for error)
+        """
+        profiles = manager.list_profiles()
+
+        if not profiles:
+            print("No profiles configured")
+            print("\nTo add a profile, run: agentic-api-cli profile add")
+            return 0
+
+        default_profile = manager.get_default_profile()
+
+        print(f"Available profiles ({len(profiles)}):")
+        print()
+
+        for profile_name in profiles:
+            profile = manager.get_profile_display(profile_name, show_keys=args.show_keys)
+            default_marker = " (default)" if profile_name == default_profile else ""
+            print(f"  {profile_name}{default_marker}")
+            print(f"    API Key:     {profile['api_key']}")
+            print(f"    App ID:      {profile['app_id']}")
+            print(f"    Environment: {profile['env_name']}")
+            print(f"    Base URL:    {profile['base_url']}")
+            print(f"    Timeout:     {profile['timeout']}s")
+            print()
+
+        return 0
+
+    def _handle_profile_delete(self, args: argparse.Namespace, manager) -> int:
+        """
+        Handle profile delete command.
+
+        Args:
+            args: Parsed arguments
+            manager: ProfileManager instance
+
+        Returns:
+            Exit code (0 for success, 1 for error)
+        """
+        name = args.name
+
+        # Confirm deletion
+        response = input(f"Delete profile '{name}'? [y/N]: ").strip().lower()
+        if response not in ['y', 'yes']:
+            print("Cancelled")
+            return 0
+
+        manager.delete_profile(name)
+        print(f"Profile '{name}' deleted successfully")
+
+        # Warn if we deleted the default
+        default_profile = manager.get_default_profile()
+        if default_profile is None and manager.list_profiles():
+            print("\nNote: No default profile is set. Set one with:")
+            print("  agentic-api-cli profile set-default <name>")
+
+        return 0
+
+    def _handle_profile_set_default(self, args: argparse.Namespace, manager) -> int:
+        """
+        Handle profile set-default command.
+
+        Args:
+            args: Parsed arguments
+            manager: ProfileManager instance
+
+        Returns:
+            Exit code (0 for success, 1 for error)
+        """
+        name = args.name
+        manager.set_default_profile(name)
+        print(f"Default profile set to '{name}'")
+        return 0
+
     def run(self, argv: Optional[list[str]] = None) -> int:
         """
         Run the CLI application.
@@ -422,13 +716,17 @@ Environment Variables:
         try:
             args = self.parser.parse_args(argv)
 
-            # Set up logging based on arguments
+            # Set up logging based on arguments (with defaults for profile command)
             setup_logging(
-                log_level=args.log_level,
-                log_file=args.log_file if hasattr(args, 'log_file') else None,
-                verbose=args.verbose if hasattr(args, 'verbose') else False,
+                log_level=getattr(args, 'log_level', 'WARNING'),
+                log_file=getattr(args, 'log_file', None),
+                verbose=getattr(args, 'verbose', False),
             )
             logger = get_logger()
+
+            # Handle profile command separately (no config/client needed)
+            if args.command == "profile":
+                return self._handle_profile(args)
 
             # Load configuration
             self.config = self._load_config(args)

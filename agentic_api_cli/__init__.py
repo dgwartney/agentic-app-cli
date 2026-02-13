@@ -34,6 +34,7 @@ from agentic_api_cli.exceptions import (
     TimeoutError,
     ValidationError,
 )
+from agentic_api_cli.profiles import ProfileManager
 
 __all__ = [
     "__version__",
@@ -48,6 +49,7 @@ __all__ = [
     # Core Classes
     "Config",
     "AgenticAPIClient",
+    "ProfileManager",
     # Exceptions
     "AgenticAPIError",
     "AuthenticationError",

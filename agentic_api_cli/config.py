@@ -21,17 +21,36 @@ class Config:
     Loads configuration from environment variables with optional .env file support.
     """
 
-    def __init__(self, env_file: Optional[str] = None) -> None:
+    def __init__(self, env_file: Optional[str] = None, profile: Optional[str] = None) -> None:
         """
         Initialize configuration.
+
+        Configuration precedence (highest to lowest):
+        1. Command-line arguments (applied in CLI._load_config)
+        2. Environment variables
+        3. Profile values
+        4. Built-in defaults
 
         Args:
             env_file: Path to .env file (optional). If not provided, will look for .env
                      in current directory.
+            profile: Profile name to load configuration from (optional)
         """
         logger = get_logger('config')
 
-        # Load from .env file if it exists
+        # Start with built-in defaults
+        self._api_key = None
+        self._app_id = None
+        self._env_name = "production"
+        self._base_url = "https://agent-platform.kore.ai/api/v2"
+        self._timeout = 30
+
+        # Load from profile if specified (precedence: 3)
+        if profile:
+            logger.debug(f"Loading configuration from profile: {profile}")
+            self._load_from_profile(profile)
+
+        # Load from .env file if it exists (will be overridden by env vars)
         if env_file:
             logger.debug(f"Loading environment from file: {env_file}")
             load_dotenv(env_file)
@@ -42,14 +61,47 @@ class Config:
                 logger.debug(f"Loading environment from: {env_path}")
                 load_dotenv(env_path)
 
-        # Load configuration from environment variables
-        self._api_key = os.getenv("KOREAI_API_KEY")
-        self._app_id = os.getenv("KOREAI_APP_ID")
-        self._env_name = os.getenv("KOREAI_ENV_NAME", "production")
-        self._base_url = os.getenv("KOREAI_BASE_URL", "https://agent-platform.kore.ai/api/v2")
-        self._timeout = int(os.getenv("KOREAI_TIMEOUT", "30"))
+        # Load configuration from environment variables (precedence: 2)
+        # These override profile values
+        if os.getenv("KOREAI_API_KEY"):
+            self._api_key = os.getenv("KOREAI_API_KEY")
+        if os.getenv("KOREAI_APP_ID"):
+            self._app_id = os.getenv("KOREAI_APP_ID")
+        if os.getenv("KOREAI_ENV_NAME"):
+            self._env_name = os.getenv("KOREAI_ENV_NAME")
+        if os.getenv("KOREAI_BASE_URL"):
+            self._base_url = os.getenv("KOREAI_BASE_URL")
+        if os.getenv("KOREAI_TIMEOUT"):
+            self._timeout = int(os.getenv("KOREAI_TIMEOUT"))
 
         logger.debug(f"Configuration initialized: env_name={self._env_name}, base_url={self._base_url}, timeout={self._timeout}")
+
+    def _load_from_profile(self, profile_name: str) -> None:
+        """
+        Load configuration from a profile.
+
+        Args:
+            profile_name: Name of the profile to load
+
+        Raises:
+            ConfigurationError: If profile doesn't exist or can't be loaded
+        """
+        from agentic_api_cli.profiles import ProfileManager
+
+        logger = get_logger('config')
+        manager = ProfileManager()
+
+        try:
+            profile = manager.get_profile(profile_name)
+            self._api_key = profile.get("api_key")
+            self._app_id = profile.get("app_id")
+            self._env_name = profile.get("env_name", "production")
+            self._base_url = profile.get("base_url", "https://agent-platform.kore.ai/api/v2")
+            self._timeout = profile.get("timeout", 30)
+            logger.info(f"Loaded configuration from profile: {profile_name}")
+        except Exception as e:
+            logger.error(f"Failed to load profile '{profile_name}': {e}")
+            raise
 
     @property
     def api_key(self) -> str:
