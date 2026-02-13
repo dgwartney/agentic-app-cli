@@ -92,41 +92,6 @@ The following credentials must be configured (via environment variables or confi
 
 The following features are planned for future implementation:
 
-### Task 3: Enhance debug option with debugMode support
-
-Update debug functionality to support the actual API's debug structure with enable flag and debugMode options.
-
-**Requirements:**
-- Update API request to include debug object with enable and debugMode fields
-- Add new CLI option `--debug-mode` with choices: `function-call`, `thoughts`, `all`
-- `--debug` flag enables debug with default mode (all)
-- `--debug-mode` requires `--debug` to be set
-
-**API debug object structure:**
-```json
-{
-  "debug": {
-    "enable": true,
-    "debugMode": "all"  // or "function-call" or "thoughts"
-  }
-}
-```
-
-**Example usage:**
-```bash
-agentic-api-cli execute --query "test" --session-id 123 --debug
-agentic-api-cli execute --query "test" --session-id 123 --debug --debug-mode thoughts
-```
-
-**Updates needed:**
-- Update `cli.py` execute command arguments
-- Update `client.py execute_run()` to send debug object with debugMode
-- Update `api_reference.py` DebugConfig TypedDict to include debugMode field
-- Update output handler to display debug information from response
-- Document debug modes in help text
-
-**Note:** API currently only supports 'thoughts' mode fully
-
 ### Task 4: Create interactive chat command
 
 Implement a new `chat` command that provides an interactive REPL-style chat session with the agentic app.
@@ -317,3 +282,16 @@ Agent: Hi! Welcome! How can I help you?
 - Configuration precedence: CLI args > Env vars > Profiles > Defaults
 - Interactive and CLI-based profile creation
 - API key masking in list output
+
+### ✅ Task 3: Enhanced debug option with debugMode support
+- Updated `DebugMode` enum with `ALL`, `FUNCTION_CALL`, and `THOUGHTS` values
+- Added `debugMode` field to `DebugConfig` TypedDict
+- Implemented `--debug-mode` CLI option with choices: "all", "function-call", "thoughts"
+- `--debug` flag alone sends `{"debug": {"enable": true}}` (backward compatible, no debugMode field)
+- `--debug --debug-mode <mode>` sends `{"debug": {"enable": true, "debugMode": "<mode>"}}`
+- `--debug-mode` requires `--debug` to be set (CLI-level validation)
+- Debug information display in CLI output (summary in normal mode, details in verbose)
+- Comprehensive test coverage for all debug modes (128 tests passing)
+- Type-safe implementation with ValidationError for invalid modes
+- API validates debugMode values server-side; client passes through user choice
+- **Note:** Based on testing, API may require "thoughts" mode; other modes available for future compatibility

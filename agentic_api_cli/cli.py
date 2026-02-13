@@ -161,7 +161,7 @@ Examples:
   agentic-api-cli execute --query "What is the weather?" --session-id session-001
 
   # Execute with options
-  agentic-api-cli execute --query "Explain AI" --session-id session-001 --stream tokens --debug
+  agentic-api-cli execute --query "Explain AI" --session-id session-001 --stream tokens --debug --debug-mode thoughts
 
   # Use different environment
   agentic-api-cli execute --env-name stage --query "Test" --session-id session-001
@@ -236,6 +236,12 @@ Environment Variables:
             "--debug",
             action="store_true",
             help="Enable debug mode",
+        )
+        execute_parser.add_argument(
+            "--debug-mode",
+            choices=["all", "function-call", "thoughts"],
+            help="Debug mode level (requires --debug). Note: API currently validates 'thoughts'; others may be rejected",
+            metavar="MODE",
         )
         execute_parser.add_argument(
             "--metadata",
@@ -450,6 +456,16 @@ Environment Variables:
             if "error" in data:
                 print(f"\nError: {data['error']}")
 
+            # Show debug information if present
+            if "debug" in data and not as_json:
+                debug_info = data["debug"]
+                if verbose:
+                    print(f"\nDebug Information:\n{json.dumps(debug_info, indent=2)}")
+                else:
+                    # Show summary in normal mode
+                    if isinstance(debug_info, dict):
+                        print("\n[Debug] Debug information available (use --verbose to see details)")
+
             # Verbose mode shows full response
             if verbose:
                 print(f"\nFull Response:\n{json.dumps(data, indent=2)}")
@@ -477,6 +493,15 @@ Environment Variables:
                     print(f"Error: Invalid JSON in --metadata: {e}", file=sys.stderr)
                     return 1
 
+            # Validate debug options
+            debug_mode = None
+            if hasattr(args, 'debug_mode') and args.debug_mode:
+                if not args.debug:
+                    logger.error("--debug-mode requires --debug to be set")
+                    print("Error: --debug-mode requires --debug flag to be set", file=sys.stderr)
+                    return 1
+                debug_mode = args.debug_mode
+
             logger.info(f"Executing run with session: {args.session_id}")
             if args.verbose:
                 print(f"Executing run with session: {args.session_id}")
@@ -492,6 +517,7 @@ Environment Variables:
                 stream_enabled=bool(args.stream),
                 stream_mode=args.stream if args.stream else None,
                 debug_enabled=args.debug if hasattr(args, 'debug') else False,
+                debug_mode=debug_mode,
                 metadata=metadata,
             )
 

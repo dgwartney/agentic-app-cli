@@ -170,6 +170,62 @@ class TestExecuteRun:
         assert request_body["metaData"] == metadata
 
     @patch("requests.Session.post")
+    def test_execute_run_with_debug_mode(self, mock_post, client):
+        """Test execute run with debug mode."""
+        mock_response = Mock()
+        mock_response.status_code = 201
+        mock_response.json.return_value = {"output": [], "sessionInfo": {}}
+        mock_response.text = "success"
+        mock_post.return_value = mock_response
+
+        client.execute_run(
+            query="Hello",
+            session_identity="session-123",
+            debug_enabled=True,
+            debug_mode="thoughts",
+        )
+
+        # Verify debug config with debugMode was included in request
+        call_args = mock_post.call_args
+        request_body = call_args[1]["json"]
+        assert "debug" in request_body
+        assert request_body["debug"]["enable"] is True
+        assert request_body["debug"]["debugMode"] == "thoughts"
+
+    @patch("requests.Session.post")
+    def test_execute_run_debug_without_mode(self, mock_post, client):
+        """Test execute run with debug but no mode specified."""
+        mock_response = Mock()
+        mock_response.status_code = 201
+        mock_response.json.return_value = {"output": [], "sessionInfo": {}}
+        mock_response.text = "success"
+        mock_post.return_value = mock_response
+
+        client.execute_run(
+            query="Hello",
+            session_identity="session-123",
+            debug_enabled=True,
+        )
+
+        # Verify debug config was included without debugMode
+        call_args = mock_post.call_args
+        request_body = call_args[1]["json"]
+        assert "debug" in request_body
+        assert request_body["debug"]["enable"] is True
+        assert "debugMode" not in request_body["debug"]
+
+    def test_execute_run_validation_invalid_debug_mode(self, client):
+        """Test that invalid debug mode raises ValidationError."""
+        with pytest.raises(ValidationError) as exc_info:
+            client.execute_run(
+                query="Hello",
+                session_identity="session-123",
+                debug_enabled=True,
+                debug_mode="invalid",  # truly invalid mode
+            )
+        assert "Invalid debug mode" in str(exc_info.value)
+
+    @patch("requests.Session.post")
     def test_execute_run_401_error(self, mock_post, client):
         """Test execute run with 401 authentication error."""
         mock_response = Mock()

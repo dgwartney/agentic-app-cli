@@ -64,6 +64,7 @@ class AgenticAPIClient:
         stream_enabled: bool = False,
         stream_mode: Optional[str] = None,
         debug_enabled: bool = False,
+        debug_mode: Optional[str] = None,
         metadata: Optional[dict[str, Any]] = None,
     ) -> dict[str, Any]:
         """
@@ -76,6 +77,7 @@ class AgenticAPIClient:
             stream_enabled: Enable streaming
             stream_mode: Streaming mode ('tokens', 'messages', or 'custom')
             debug_enabled: Enable debug mode
+            debug_mode: Debug mode level ('all', 'function-call', or 'thoughts')
             metadata: Custom metadata dictionary
 
         Returns:
@@ -98,6 +100,11 @@ class AgenticAPIClient:
         if stream_mode and stream_mode not in ["tokens", "messages", "custom"]:
             raise ValidationError(
                 f"Invalid stream mode: {stream_mode}. Must be 'tokens', 'messages', or 'custom'"
+            )
+
+        if debug_mode and debug_mode not in ["all", "function-call", "thoughts"]:
+            raise ValidationError(
+                f"Invalid debug mode: {debug_mode}. Must be 'all', 'function-call', or 'thoughts'"
             )
 
         # Build request URL
@@ -130,6 +137,8 @@ class AgenticAPIClient:
             request_body["debug"] = {
                 "enable": True
             }
+            if debug_mode:
+                request_body["debug"]["debugMode"] = debug_mode
 
         # Add metadata if provided
         if metadata:

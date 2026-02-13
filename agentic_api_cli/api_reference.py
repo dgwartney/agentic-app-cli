@@ -34,10 +34,10 @@ class StreamMode(str, Enum):
 
 
 class DebugMode(str, Enum):
-    """Debug verbosity level"""
-    ALL = "all"          # Full debug information
-    SUMMARY = "summary"  # Summary debug information
-    OFF = "off"          # No debug information (default)
+    """Debug mode for execute run endpoint"""
+    ALL = "all"                      # Full debug information
+    FUNCTION_CALL = "function-call"  # Function call debugging
+    THOUGHTS = "thoughts"            # Thought process debugging
 
 
 class RunStatus(str, Enum):
@@ -117,8 +117,10 @@ class DebugConfig(TypedDict, total=False):
 
     Attributes:
         enable: Enable debug mode (true/false)
+        debugMode: Debug mode level ("all", "function-call", or "thoughts")
     """
     enable: bool
+    debugMode: str  # "all", "function-call", or "thoughts"
 
 
 class ExecuteRunRequest(TypedDict, total=False):

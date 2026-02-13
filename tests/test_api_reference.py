@@ -33,8 +33,8 @@ class TestConstants:
     def test_debug_mode_enum(self):
         """Test DebugMode enum values."""
         assert DebugMode.ALL.value == "all"
-        assert DebugMode.SUMMARY.value == "summary"
-        assert DebugMode.OFF.value == "off"
+        assert DebugMode.FUNCTION_CALL.value == "function-call"
+        assert DebugMode.THOUGHTS.value == "thoughts"
 
     def test_run_status_enum(self):
         """Test RunStatus enum values."""

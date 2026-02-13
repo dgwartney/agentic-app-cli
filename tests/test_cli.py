@@ -170,6 +170,155 @@ class TestExecuteCommand:
         assert call_kwargs["debug_enabled"] is True
 
     @patch("agentic_api_cli.cli.AgenticAPIClient")
+    def test_execute_with_debug_mode(self, mock_client_class, cli, mock_env):
+        """Test execute command with debug mode."""
+        mock_client = Mock()
+        mock_client.execute_run.return_value = {
+            "output": [{"type": "text", "content": "Response"}],
+            "sessionInfo": {},
+        }
+        mock_client_class.return_value = mock_client
+
+        exit_code = cli.run(
+            [
+                "execute",
+                "--session-id",
+                "session-123",
+                "--query",
+                "Hello",
+                "--debug",
+                "--debug-mode",
+                "thoughts",
+            ]
+        )
+
+        assert exit_code == 0
+        call_kwargs = mock_client.execute_run.call_args[1]
+        assert call_kwargs["debug_enabled"] is True
+        assert call_kwargs["debug_mode"] == "thoughts"
+
+    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    def test_execute_with_debug_mode_all(self, mock_client_class, cli, mock_env):
+        """Test execute command with debug mode 'all'."""
+        mock_client = Mock()
+        mock_client.execute_run.return_value = {
+            "output": [{"type": "text", "content": "Response"}],
+            "sessionInfo": {},
+        }
+        mock_client_class.return_value = mock_client
+
+        exit_code = cli.run(
+            [
+                "execute",
+                "--session-id",
+                "session-123",
+                "--query",
+                "Hello",
+                "--debug",
+                "--debug-mode",
+                "all",
+            ]
+        )
+
+        assert exit_code == 0
+        call_kwargs = mock_client.execute_run.call_args[1]
+        assert call_kwargs["debug_enabled"] is True
+        assert call_kwargs["debug_mode"] == "all"
+
+    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    def test_execute_with_debug_mode_function_call(self, mock_client_class, cli, mock_env):
+        """Test execute command with debug mode 'function-call'."""
+        mock_client = Mock()
+        mock_client.execute_run.return_value = {
+            "output": [{"type": "text", "content": "Response"}],
+            "sessionInfo": {},
+        }
+        mock_client_class.return_value = mock_client
+
+        exit_code = cli.run(
+            [
+                "execute",
+                "--session-id",
+                "session-123",
+                "--query",
+                "Hello",
+                "--debug",
+                "--debug-mode",
+                "function-call",
+            ]
+        )
+
+        assert exit_code == 0
+        call_kwargs = mock_client.execute_run.call_args[1]
+        assert call_kwargs["debug_enabled"] is True
+        assert call_kwargs["debug_mode"] == "function-call"
+
+    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    def test_execute_debug_without_mode(self, mock_client_class, cli, mock_env):
+        """Test that --debug alone does not set debug_mode (backward compatible)."""
+        mock_client = Mock()
+        mock_client.execute_run.return_value = {
+            "output": [{"type": "text", "content": "Response"}],
+            "sessionInfo": {},
+        }
+        mock_client_class.return_value = mock_client
+
+        exit_code = cli.run(
+            [
+                "execute",
+                "--session-id",
+                "session-123",
+                "--query",
+                "Hello",
+                "--debug",
+            ]
+        )
+
+        assert exit_code == 0
+        call_kwargs = mock_client.execute_run.call_args[1]
+        assert call_kwargs["debug_enabled"] is True
+        assert call_kwargs["debug_mode"] is None
+
+    def test_execute_debug_mode_without_debug_flag(self, cli, mock_env):
+        """Test that --debug-mode without --debug raises error."""
+        with patch("sys.stderr", new=StringIO()) as fake_err:
+            exit_code = cli.run(
+                [
+                    "execute",
+                    "--session-id",
+                    "session-123",
+                    "--query",
+                    "Hello",
+                    "--debug-mode",
+                    "thoughts",
+                ]
+            )
+
+        assert exit_code == 1
+        assert "--debug-mode requires --debug" in fake_err.getvalue()
+
+    def test_execute_invalid_debug_mode(self, cli, mock_env):
+        """Test that invalid debug mode is rejected by argparse."""
+        with patch("sys.stderr", new=StringIO()) as fake_err:
+            with pytest.raises(SystemExit) as exc_info:
+                cli.run(
+                    [
+                        "execute",
+                        "--session-id",
+                        "session-123",
+                        "--query",
+                        "Hello",
+                        "--debug",
+                        "--debug-mode",
+                        "invalid",  # truly invalid mode
+                    ]
+                )
+
+        assert exc_info.value.code == 2  # argparse exits with code 2 for argument errors
+        stderr_output = fake_err.getvalue()
+        assert "invalid choice" in stderr_output
+
+    @patch("agentic_api_cli.cli.AgenticAPIClient")
     def test_execute_with_metadata(self, mock_client_class, cli, mock_env):
         """Test execute command with metadata."""
         mock_client = Mock()
