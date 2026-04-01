@@ -132,6 +132,10 @@ addopts = [
     "--cov-report=term-missing",
     "--cov-report=html",
     "--cov-report=xml",
+    "--ignore=tests/e2e",
+]
+markers = [
+    "e2e: end-to-end tests that make real API calls",
 ]
 
 # mypy configuration

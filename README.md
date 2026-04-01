@@ -464,6 +464,7 @@ headers = build_headers(api_key="your-api-key")
 
 - [API Documentation](https://docs.kore.ai/agentic-platform/)
 - [Type Reference](./agxr/api_reference.py)
+- [Testing Guide](./TESTING.md) — End-to-end agent testing with `AgentTestSession`
 
 ## Requirements
 
