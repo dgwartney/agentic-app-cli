@@ -7,9 +7,9 @@ from unittest.mock import Mock, patch
 import pytest
 import requests
 
-from agentic_api_cli.client import AgenticAPIClient
-from agentic_api_cli.config import Config
-from agentic_api_cli.exceptions import (
+from agxr.client import AgenticAPIClient
+from agxr.config import Config
+from agxr.exceptions import (
     APIRequestError,
     APIResponseError,
     AuthenticationError,

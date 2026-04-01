@@ -10,8 +10,8 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from agentic_api_cli.cli import CLI
-from agentic_api_cli.exceptions import AgenticAPIError, ConfigurationError
+from agxr.cli import CLI
+from agxr.exceptions import AgenticAPIError, ConfigurationError
 
 
 @pytest.fixture
@@ -47,7 +47,7 @@ class TestCLIInit:
 class TestExecuteCommand:
     """Test execute command."""
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     def test_execute_basic(self, mock_client_class, cli, mock_env):
         """Test basic execute command."""
         mock_client = Mock()
@@ -65,7 +65,7 @@ class TestExecuteCommand:
         assert exit_code == 0
         assert "Hello!" in fake_out.getvalue()
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     def test_execute_with_json_output(self, mock_client_class, cli, mock_env):
         """Test execute command with JSON output."""
         mock_client = Mock()
@@ -92,7 +92,7 @@ class TestExecuteCommand:
         parsed = json.loads(output)
         assert "output" in parsed
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     def test_execute_with_user_id(self, mock_client_class, cli, mock_env):
         """Test execute command with user ID."""
         mock_client = Mock()
@@ -119,7 +119,7 @@ class TestExecuteCommand:
         call_kwargs = mock_client.execute_run.call_args[1]
         assert call_kwargs["user_reference"] == "user-456"
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     def test_execute_with_stream(self, mock_client_class, cli, mock_env):
         """Test execute command with streaming."""
         mock_client = Mock()
@@ -146,7 +146,7 @@ class TestExecuteCommand:
         assert call_kwargs["stream_enabled"] is True
         assert call_kwargs["stream_mode"] == "tokens"
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     def test_execute_with_debug(self, mock_client_class, cli, mock_env):
         """Test execute command with debug enabled."""
         mock_client = Mock()
@@ -171,7 +171,7 @@ class TestExecuteCommand:
         call_kwargs = mock_client.execute_run.call_args[1]
         assert call_kwargs["debug_enabled"] is True
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     def test_execute_with_debug_mode(self, mock_client_class, cli, mock_env):
         """Test execute command with debug mode."""
         mock_client = Mock()
@@ -199,7 +199,7 @@ class TestExecuteCommand:
         assert call_kwargs["debug_enabled"] is True
         assert call_kwargs["debug_mode"] == "thoughts"
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     def test_execute_with_debug_mode_all(self, mock_client_class, cli, mock_env):
         """Test execute command with debug mode 'all'."""
         mock_client = Mock()
@@ -227,7 +227,7 @@ class TestExecuteCommand:
         assert call_kwargs["debug_enabled"] is True
         assert call_kwargs["debug_mode"] == "all"
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     def test_execute_with_debug_mode_function_call(self, mock_client_class, cli, mock_env):
         """Test execute command with debug mode 'function-call'."""
         mock_client = Mock()
@@ -255,7 +255,7 @@ class TestExecuteCommand:
         assert call_kwargs["debug_enabled"] is True
         assert call_kwargs["debug_mode"] == "function-call"
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     def test_execute_debug_without_mode(self, mock_client_class, cli, mock_env):
         """Test that --debug alone does not set debug_mode (backward compatible)."""
         mock_client = Mock()
@@ -320,7 +320,7 @@ class TestExecuteCommand:
         stderr_output = fake_err.getvalue()
         assert "invalid choice" in stderr_output
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     def test_execute_with_metadata(self, mock_client_class, cli, mock_env):
         """Test execute command with metadata."""
         mock_client = Mock()
@@ -365,7 +365,7 @@ class TestExecuteCommand:
         assert exit_code == 1
         assert "Invalid JSON" in fake_err.getvalue()
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     def test_execute_api_error(self, mock_client_class, cli, mock_env):
         """Test execute command with API error."""
         mock_client = Mock()
@@ -382,7 +382,7 @@ class TestExecuteCommand:
         assert exit_code == 1
         assert "API error" in fake_err.getvalue()
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     def test_execute_auto_generates_session_id(self, mock_client_class, cli, mock_env):
         """Test execute command auto-generates session ID when not provided."""
         mock_client = Mock()
@@ -408,7 +408,7 @@ class TestExecuteCommand:
 class TestStatusCommand:
     """Test status command."""
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     def test_status_basic(self, mock_client_class, cli, mock_env):
         """Test basic status command."""
         mock_client = Mock()
@@ -423,7 +423,7 @@ class TestStatusCommand:
         assert exit_code == 0
         mock_client.get_run_status.assert_called_once_with("run-123")
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     def test_status_with_wait(self, mock_client_class, cli, mock_env):
         """Test status command with wait."""
         mock_client = Mock()
@@ -438,7 +438,7 @@ class TestStatusCommand:
         assert exit_code == 0
         mock_client.poll_run_status.assert_called_once()
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     def test_status_with_custom_poll_params(self, mock_client_class, cli, mock_env):
         """Test status command with custom polling parameters."""
         mock_client = Mock()
@@ -463,7 +463,7 @@ class TestStatusCommand:
         assert call_kwargs["interval"] == 5
         assert call_kwargs["max_attempts"] == 10
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     def test_status_api_error(self, mock_client_class, cli, mock_env):
         """Test status command with API error."""
         mock_client = Mock()
@@ -504,7 +504,7 @@ class TestConfigCommand:
 class TestConfigurationHandling:
     """Test configuration handling."""
 
-    @patch("agentic_api_cli.config.load_dotenv")
+    @patch("agxr.config.load_dotenv")
     def test_missing_api_key(self, mock_load_dotenv, cli, monkeypatch):
         """Test error when API key is missing."""
         monkeypatch.delenv("KOREAI_API_KEY", raising=False)
@@ -522,7 +522,7 @@ class TestConfigurationHandling:
 
     def test_env_name_override(self, cli, mock_env):
         """Test env_name override with command-line argument."""
-        with patch("agentic_api_cli.cli.AgenticAPIClient") as mock_client_class:
+        with patch("agxr.cli.AgenticAPIClient") as mock_client_class:
             mock_client = Mock()
             mock_client.execute_run.return_value = {
                 "output": [],
@@ -548,7 +548,7 @@ class TestConfigurationHandling:
 class TestVerboseMode:
     """Test verbose mode."""
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     def test_verbose_output(self, mock_client_class, cli, mock_env):
         """Test verbose mode shows extra output."""
         mock_client = Mock()
@@ -579,7 +579,7 @@ class TestVerboseMode:
 class TestKeyboardInterrupt:
     """Test keyboard interrupt handling."""
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     def test_keyboard_interrupt(self, mock_client_class, cli, mock_env):
         """Test that keyboard interrupt is handled gracefully."""
         mock_client = Mock()
@@ -598,7 +598,7 @@ class TestKeyboardInterrupt:
 class TestUnexpectedError:
     """Test unexpected error handling."""
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     def test_unexpected_error(self, mock_client_class, cli, mock_env):
         """Test that unexpected errors are handled."""
         mock_client = Mock()
@@ -617,7 +617,7 @@ class TestUnexpectedError:
 class TestClientCleanup:
     """Test client cleanup."""
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     def test_client_closed_on_success(self, mock_client_class, cli, mock_env):
         """Test that client is closed on successful execution."""
         mock_client = Mock()
@@ -628,7 +628,7 @@ class TestClientCleanup:
 
         mock_client.close.assert_called_once()
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     def test_client_closed_on_error(self, mock_client_class, cli, mock_env):
         """Test that client is closed even when error occurs."""
         mock_client = Mock()
@@ -644,7 +644,7 @@ class TestClientCleanup:
 class TestChatCommand:
     """Test chat command."""
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     @patch("builtins.input")
     def test_chat_basic_conversation(self, mock_input, mock_client_class, cli, mock_env):
         """Test basic chat conversation with exit command."""
@@ -667,7 +667,7 @@ class TestChatCommand:
         assert "Agentic API Chat Session Started" in output
         assert "Goodbye!" in output
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     @patch("builtins.input")
     def test_chat_with_quit_command(self, mock_input, mock_client_class, cli, mock_env):
         """Test chat exits with 'quit' command."""
@@ -683,7 +683,7 @@ class TestChatCommand:
         exit_code = cli.run(["chat"])
         assert exit_code == 0
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     @patch("builtins.input")
     def test_chat_with_q_command(self, mock_input, mock_client_class, cli, mock_env):
         """Test chat exits with 'q' command."""
@@ -699,7 +699,7 @@ class TestChatCommand:
         exit_code = cli.run(["chat"])
         assert exit_code == 0
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     @patch("builtins.input")
     def test_chat_with_eof(self, mock_input, mock_client_class, cli, mock_env):
         """Test chat handles Ctrl+D (EOFError)."""
@@ -718,7 +718,7 @@ class TestChatCommand:
         assert exit_code == 0
         assert "Goodbye!" in fake_out.getvalue()
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     @patch("builtins.input")
     def test_chat_with_keyboard_interrupt(self, mock_input, mock_client_class, cli, mock_env):
         """Test chat handles Ctrl+C (KeyboardInterrupt)."""
@@ -734,7 +734,7 @@ class TestChatCommand:
         exit_code = cli.run(["chat"])
         assert exit_code == 130
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     @patch("builtins.input")
     def test_chat_empty_input_skipped(self, mock_input, mock_client_class, cli, mock_env):
         """Test empty input is skipped in chat."""
@@ -753,7 +753,7 @@ class TestChatCommand:
         # Only "Hello" and "World" should trigger execute_run
         assert mock_client.execute_run.call_count == 2
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     @patch("builtins.input")
     def test_chat_api_error_continues(self, mock_input, mock_client_class, cli, mock_env):
         """Test API error doesn't break chat loop."""
@@ -774,7 +774,7 @@ class TestChatCommand:
         assert "API error" in fake_err.getvalue()
         assert mock_client.execute_run.call_count == 2
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     @patch("builtins.input")
     def test_chat_with_custom_session_id(self, mock_input, mock_client_class, cli, mock_env):
         """Test chat uses provided session ID."""
@@ -798,7 +798,7 @@ class TestChatCommand:
         call_kwargs = mock_client.execute_run.call_args[1]
         assert call_kwargs["session_identity"] == "my-custom-session"
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     @patch("builtins.input")
     def test_chat_with_streaming(self, mock_input, mock_client_class, cli, mock_env):
         """Test chat passes streaming flag."""
@@ -818,7 +818,7 @@ class TestChatCommand:
         assert call_kwargs["stream_enabled"] is True
         assert call_kwargs["stream_mode"] == "tokens"
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     @patch("builtins.input")
     def test_chat_with_debug(self, mock_input, mock_client_class, cli, mock_env):
         """Test chat passes debug flags."""
@@ -838,7 +838,7 @@ class TestChatCommand:
         assert call_kwargs["debug_enabled"] is True
         assert call_kwargs["debug_mode"] == "thoughts"
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     @patch("builtins.input")
     def test_chat_session_id_auto_generation(self, mock_input, mock_client_class, cli, mock_env):
         """Test chat auto-generates session ID."""
@@ -873,7 +873,7 @@ class TestChatCommand:
 class TestChatSpecialCommands:
     """Test special commands in chat mode."""
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     @patch("builtins.input")
     def test_help_command(self, mock_input, mock_client_class, cli, mock_env):
         """Test #help command displays available commands."""
@@ -893,7 +893,7 @@ class TestChatSpecialCommands:
         # Should NOT call execute_run for special commands
         mock_client.execute_run.assert_not_called()
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     @patch("builtins.input")
     def test_debug_toggle_on(self, mock_input, mock_client_class, cli, mock_env):
         """Test #debug on enables debug mode."""
@@ -911,7 +911,7 @@ class TestChatSpecialCommands:
         # Check for debug status (may have color codes between label and value)
         assert "Debug:" in output and "enabled" in output
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     @patch("builtins.input")
     def test_debug_affects_api_calls(self, mock_input, mock_client_class, cli, mock_env):
         """Test that #debug on affects subsequent API calls."""
@@ -930,7 +930,7 @@ class TestChatSpecialCommands:
         call_kwargs = mock_client.execute_run.call_args[1]
         assert call_kwargs["debug_enabled"] is True
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     @patch("builtins.input")
     def test_stream_command(self, mock_input, mock_client_class, cli, mock_env):
         """Test #stream tokens enables token streaming."""
@@ -950,7 +950,7 @@ class TestChatSpecialCommands:
         assert call_kwargs["stream_enabled"] is True
         assert call_kwargs["stream_mode"] == "tokens"
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     @patch("builtins.input")
     @patch("uuid.uuid4")
     def test_new_command_changes_session(self, mock_uuid, mock_input, mock_client_class, cli, mock_env):
@@ -984,7 +984,7 @@ class TestChatSpecialCommands:
         session_2 = mock_client.execute_run.call_args_list[1][1]["session_identity"]
         assert session_1 != session_2
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     @patch("builtins.input")
     def test_info_command(self, mock_input, mock_client_class, cli, mock_env):
         """Test #info displays session information."""
@@ -1002,7 +1002,7 @@ class TestChatSpecialCommands:
         assert "Session ID:" in output
         assert "Environment:" in output
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     @patch("builtins.input")
     @patch("os.system")
     def test_clear_command(self, mock_system, mock_input, mock_client_class, cli, mock_env):
@@ -1019,7 +1019,7 @@ class TestChatSpecialCommands:
         call_arg = mock_system.call_args[0][0]
         assert call_arg in ['clear', 'cls']
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     @patch("builtins.input")
     def test_unknown_command(self, mock_input, mock_client_class, cli, mock_env):
         """Test unknown special command shows error."""
@@ -1036,7 +1036,7 @@ class TestChatSpecialCommands:
         assert "Unknown command: #unknown" in output
         assert "#help" in output
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     @patch("builtins.input")
     def test_case_insensitive_commands(self, mock_input, mock_client_class, cli, mock_env):
         """Test special commands are case-insensitive."""
@@ -1053,7 +1053,7 @@ class TestChatSpecialCommands:
         assert "Available Commands:" in output
         assert "Debug mode enabled" in output
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     @patch("builtins.input")
     def test_command_aliases(self, mock_input, mock_client_class, cli, mock_env):
         """Test command aliases work."""
@@ -1070,7 +1070,7 @@ class TestChatSpecialCommands:
         assert "New Session Started" in output
         assert "Session Information:" in output
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     @patch("builtins.input")
     def test_debug_query_state(self, mock_input, mock_client_class, cli, mock_env):
         """Test #debug without args shows current state."""
@@ -1086,7 +1086,7 @@ class TestChatSpecialCommands:
         output = fake_out.getvalue()
         assert "Debug mode is currently" in output
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     @patch("builtins.input")
     def test_stream_toggle_off(self, mock_input, mock_client_class, cli, mock_env):
         """Test #stream off disables streaming."""
@@ -1105,7 +1105,7 @@ class TestChatSpecialCommands:
         call_kwargs = mock_client.execute_run.call_args[1]
         assert call_kwargs["stream_enabled"] is False
 
-    @patch("agentic_api_cli.cli.AgenticAPIClient")
+    @patch("agxr.cli.AgenticAPIClient")
     @patch("builtins.input")
     def test_history_placeholder(self, mock_input, mock_client_class, cli, mock_env):
         """Test #history shows placeholder message."""

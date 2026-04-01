@@ -1,6 +1,6 @@
-# Agentic API CLI
+# agxr
 
-A Python command-line interface for interacting with the Kore.ai Agentic App Platform API.
+**agxr** (**AG**ent e**X**ecute **R**un) — A Python command-line interface for interacting with the Kore.ai Agentic App Platform API.
 
 ## Features
 
@@ -22,7 +22,26 @@ A Python command-line interface for interacting with the Kore.ai Agentic App Pla
 ### From PyPI
 
 ```bash
-pip install agentic-api-cli
+pip install agxr
+```
+
+### From GitHub
+
+```bash
+uv pip install git+https://github.com/dgwartney/agentic-app-cli.git
+```
+
+Or pin to a specific branch, tag, or commit:
+
+```bash
+# By branch
+uv pip install git+https://github.com/dgwartney/agentic-app-cli.git@main
+
+# By tag
+uv pip install git+https://github.com/dgwartney/agentic-app-cli.git@v0.1.0
+
+# By commit
+uv pip install git+https://github.com/dgwartney/agentic-app-cli.git@d25684e
 ```
 
 ### From Source
@@ -49,7 +68,7 @@ uv sync
 Create a profile with your credentials:
 
 ```bash
-agentic-api-cli profile add \
+agxr profile add \
   --name production \
   --api-key "your-api-key" \
   --app-id "your-app-id" \
@@ -59,13 +78,13 @@ agentic-api-cli profile add \
 Set it as the default:
 
 ```bash
-agentic-api-cli profile set-default production
+agxr profile set-default production
 ```
 
 ### 3. Start Chatting (Interactive Mode)
 
 ```bash
-agentic-api-cli chat
+agxr chat
 ```
 
 Type your messages and use special commands like `#help`, `#debug on`, or `#new` for runtime control. Type `exit` to quit.
@@ -74,16 +93,16 @@ Type your messages and use special commands like `#help`, `#debug on`, or `#new`
 
 ```bash
 # Session ID auto-generated
-agentic-api-cli execute --query "Hello! How can you help me today?"
+agxr execute --query "Hello! How can you help me today?"
 
 # Or use a custom session ID
-agentic-api-cli execute --query "Hello!" --session-id my-session-001
+agxr execute --query "Hello!" --session-id my-session-001
 ```
 
 ### 5. View Configuration
 
 ```bash
-agentic-api-cli config
+agxr config
 ```
 
 ## Configuration
@@ -109,12 +128,12 @@ Profiles allow you to store multiple configuration sets and easily switch betwee
 
 Create a profile interactively:
 ```bash
-agentic-api-cli profile add
+agxr profile add
 ```
 
 Or provide all values via command-line arguments:
 ```bash
-agentic-api-cli profile add \
+agxr profile add \
   --name production \
   --api-key "kg-your-api-key" \
   --app-id "aa-your-app-id" \
@@ -127,35 +146,35 @@ agentic-api-cli profile add \
 View all configured profiles:
 ```bash
 # List with masked API keys (default)
-agentic-api-cli profile list
+agxr profile list
 
 # Show full API keys
-agentic-api-cli profile list --show-keys
+agxr profile list --show-keys
 ```
 
 #### Set Default Profile
 
 Set a profile to be used automatically when `--profile` is not specified:
 ```bash
-agentic-api-cli profile set-default production
+agxr profile set-default production
 ```
 
 #### Use a Profile
 
 Use a specific profile:
 ```bash
-agentic-api-cli --profile staging execute --query "Test query" --session-id s1
+agxr --profile staging execute --query "Test query" --session-id s1
 ```
 
 Or use the default profile (no `--profile` flag needed):
 ```bash
-agentic-api-cli execute --query "Test query" --session-id s1
+agxr execute --query "Test query" --session-id s1
 ```
 
 #### Delete a Profile
 
 ```bash
-agentic-api-cli profile delete staging
+agxr profile delete staging
 ```
 
 #### Profile Storage
@@ -189,7 +208,7 @@ KOREAI_ENV_NAME=production
 
 Or specify a custom .env file location:
 ```bash
-agentic-api-cli --env-file /path/to/.env execute --query "Hello" --session-id s1
+agxr --env-file /path/to/.env execute --query "Hello" --session-id s1
 ```
 
 ## Usage
@@ -198,29 +217,29 @@ agentic-api-cli --env-file /path/to/.env execute --query "Hello" --session-id s1
 
 Execute a run with auto-generated session ID:
 ```bash
-agentic-api-cli execute --query "What is the weather in San Francisco?"
+agxr execute --query "What is the weather in San Francisco?"
 ```
 
 Execute with a custom session ID:
 ```bash
-agentic-api-cli execute --query "What is the weather?" --session-id my-session-001
+agxr execute --query "What is the weather?" --session-id my-session-001
 ```
 
 Execute using a specific profile:
 ```bash
-agentic-api-cli --profile production execute --query "Hello, how are you?"
+agxr --profile production execute --query "Hello, how are you?"
 ```
 
 Execute using the default profile:
 ```bash
-agentic-api-cli execute --query "Explain quantum computing"
+agxr execute --query "Explain quantum computing"
 ```
 
 ### Stream Responses
 
 Stream responses token-by-token for real-time output:
 ```bash
-agentic-api-cli execute \
+agxr execute \
   --query "Explain quantum computing" \
   --session-id session-001 \
   --stream tokens
@@ -228,7 +247,7 @@ agentic-api-cli execute \
 
 Stream by messages:
 ```bash
-agentic-api-cli execute \
+agxr execute \
   --query "Write a story" \
   --session-id session-001 \
   --stream messages
@@ -238,12 +257,12 @@ agentic-api-cli execute \
 
 Check the status of an asynchronous run:
 ```bash
-agentic-api-cli status --run-id run-xyz-789
+agxr status --run-id run-xyz-789
 ```
 
 Wait for completion with polling:
 ```bash
-agentic-api-cli status \
+agxr status \
   --run-id run-xyz-789 \
   --wait \
   --poll-interval 2 \
@@ -254,17 +273,17 @@ agentic-api-cli status \
 
 Start an interactive chat session:
 ```bash
-agentic-api-cli chat
+agxr chat
 ```
 
 Chat with streaming enabled:
 ```bash
-agentic-api-cli chat --stream tokens
+agxr chat --stream tokens
 ```
 
 Chat with debug mode:
 ```bash
-agentic-api-cli chat --debug --debug-mode thoughts
+agxr chat --debug --debug-mode thoughts
 ```
 
 **Special Commands in Chat:**
@@ -304,7 +323,7 @@ Goodbye! Session ended.
 
 Enable debug output for development:
 ```bash
-agentic-api-cli execute \
+agxr execute \
   --query "Test query" \
   --session-id session-001 \
   --debug
@@ -313,19 +332,19 @@ agentic-api-cli execute \
 Enable specific debug modes:
 ```bash
 # Show all debug information
-agentic-api-cli execute \
+agxr execute \
   --query "Test query" \
   --session-id session-001 \
   --debug --debug-mode all
 
 # Show only function calls
-agentic-api-cli execute \
+agxr execute \
   --query "Test query" \
   --session-id session-001 \
   --debug --debug-mode function-call
 
 # Show agent thoughts
-agentic-api-cli execute \
+agxr execute \
   --query "Test query" \
   --session-id session-001 \
   --debug --debug-mode thoughts
@@ -335,14 +354,14 @@ agentic-api-cli execute \
 
 Enable file logging:
 ```bash
-agentic-api-cli --log-file app.log execute \
+agxr --log-file app.log execute \
   --query "Test query" \
   --session-id session-001
 ```
 
 Set log level:
 ```bash
-agentic-api-cli --log-level DEBUG execute \
+agxr --log-level DEBUG execute \
   --query "Test query" \
   --session-id session-001
 ```
@@ -351,19 +370,19 @@ agentic-api-cli --log-level DEBUG execute \
 
 View the current configuration (with masked sensitive data):
 ```bash
-agentic-api-cli config
+agxr config
 ```
 
 View configuration for a specific profile:
 ```bash
-agentic-api-cli config --profile staging
+agxr config --profile staging
 ```
 
 ### Override Configuration
 
 Override specific configuration values (highest precedence):
 ```bash
-agentic-api-cli --profile production \
+agxr --profile production \
   --env-name staging \
   --timeout 60 \
   execute --query "Test" --session-id s1
@@ -390,7 +409,7 @@ source .venv/bin/activate
 ### Run in Development
 
 ```bash
-uv run agentic-api-cli
+uv run agxr
 ```
 
 ### Run Tests
@@ -404,7 +423,7 @@ uv run pytest
 The package includes comprehensive type definitions and constants for the Kore.ai API:
 
 ```python
-from agentic_api_cli import (
+from agxr import (
     BASE_URL,
     StreamMode,
     DebugMode,
@@ -444,7 +463,7 @@ headers = build_headers(api_key="your-api-key")
 ## Documentation
 
 - [API Documentation](https://docs.kore.ai/agentic-platform/)
-- [Type Reference](./agentic_api_cli/api_reference.py)
+- [Type Reference](./agxr/api_reference.py)
 
 ## Requirements
 

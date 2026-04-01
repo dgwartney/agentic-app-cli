@@ -4,7 +4,7 @@ Unit tests for API reference module.
 
 import pytest
 
-from agentic_api_cli.api_reference import (
+from agxr.api_reference import (
     BASE_URL,
     DebugMode,
     RunStatus,

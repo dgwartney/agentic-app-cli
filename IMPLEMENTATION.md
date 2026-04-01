@@ -11,7 +11,7 @@ This implementation provides a production-ready, class-based command-line interf
 ### Module Structure
 
 ```
-agentic_api_cli/
+agxr/
 ├── __init__.py          # Package exports (1.2K, 57 lines)
 ├── api_reference.py     # API types and constants (9.8K, 349 lines)
 ├── cli.py               # CLI with argparse (15K, 476 lines)
@@ -184,35 +184,35 @@ with AgenticAPIClient(config) as client:
 
 ```bash
 # Basic execution
-agentic-api-cli execute \
+agxr execute \
   --query "What is AI?" \
   --session-id session-001
 
 # With streaming
-agentic-api-cli execute \
+agxr execute \
   --query "Explain quantum computing" \
   --session-id session-002 \
   --stream tokens \
   --verbose
 
 # Async with wait
-agentic-api-cli execute \
+agxr execute \
   --query "Complex task" \
   --session-id session-003 \
   --async \
   --wait
 
 # Check status
-agentic-api-cli status --run-id run-xyz-789
+agxr status --run-id run-xyz-789
 
 # Show config
-agentic-api-cli config
+agxr config
 ```
 
 ### Python API Usage
 
 ```python
-from agentic_api_cli import Config, AgenticAPIClient
+from agxr import Config, AgenticAPIClient
 
 # Configure
 config = Config()
@@ -391,14 +391,14 @@ The implementation is designed for easy testing:
 
 ```bash
 # Test CLI
-uv run agentic-api-cli --help
-uv run agentic-api-cli execute --help
-uv run agentic-api-cli status --help
-uv run agentic-api-cli config --help
-uv run agentic-api-cli config
+uv run agxr --help
+uv run agxr execute --help
+uv run agxr status --help
+uv run agxr config --help
+uv run agxr config
 
 # Test imports
-uv run python -c "from agentic_api_cli import Config, AgenticAPIClient; print('✓ OK')"
+uv run python -c "from agxr import Config, AgenticAPIClient; print('✓ OK')"
 
 # Test build
 uv build

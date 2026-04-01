@@ -16,7 +16,7 @@ Comprehensive guide for using the Agentic API CLI.
 ## Installation
 
 ```bash
-pip install agentic-api-cli
+pip install agxr
 ```
 
 ## Configuration
@@ -48,7 +48,7 @@ KOREAI_ENV_NAME=production
 Or specify a custom location:
 
 ```bash
-agentic-api-cli --env-file /path/to/.env execute --query "Hello" --session-id session-1
+agxr --env-file /path/to/.env execute --query "Hello" --session-id session-1
 ```
 
 ### Command-line Arguments
@@ -56,7 +56,7 @@ agentic-api-cli --env-file /path/to/.env execute --query "Hello" --session-id se
 Override any configuration using command-line flags:
 
 ```bash
-agentic-api-cli --api-key YOUR_KEY --app-id YOUR_APP execute --query "Hello" --session-id session-1
+agxr --api-key YOUR_KEY --app-id YOUR_APP execute --query "Hello" --session-id session-1
 ```
 
 ## Commands
@@ -68,7 +68,7 @@ Execute an agentic run with a query.
 **Basic Usage:**
 
 ```bash
-agentic-api-cli execute --query "What is the weather?" --session-id session-001
+agxr execute --query "What is the weather?" --session-id session-001
 ```
 
 **Options:**
@@ -89,37 +89,37 @@ agentic-api-cli execute --query "What is the weather?" --session-id session-001
 
 ```bash
 # Synchronous execution
-agentic-api-cli execute \
+agxr execute \
   --query "Explain quantum computing" \
   --session-id session-001
 
 # With streaming
-agentic-api-cli execute \
+agxr execute \
   --query "Write a story" \
   --session-id session-002 \
   --stream tokens
 
 # Asynchronous execution
-agentic-api-cli execute \
+agxr execute \
   --query "Analyze large dataset" \
   --session-id session-003 \
   --async
 
 # Async with automatic waiting
-agentic-api-cli execute \
+agxr execute \
   --query "Process data" \
   --session-id session-004 \
   --async \
   --wait
 
 # With metadata
-agentic-api-cli execute \
+agxr execute \
   --query "Hello" \
   --session-id session-005 \
   --metadata '{"userId": "user123", "source": "cli"}'
 
 # With debug mode
-agentic-api-cli execute \
+agxr execute \
   --query "Test query" \
   --session-id session-006 \
   --debug all \
@@ -133,7 +133,7 @@ Check the status of an asynchronous run.
 **Basic Usage:**
 
 ```bash
-agentic-api-cli status --run-id run-xyz-789
+agxr status --run-id run-xyz-789
 ```
 
 **Options:**
@@ -147,17 +147,17 @@ agentic-api-cli status --run-id run-xyz-789
 
 ```bash
 # Check status once
-agentic-api-cli status --run-id run-abc-123
+agxr status --run-id run-abc-123
 
 # Poll until completion
-agentic-api-cli status \
+agxr status \
   --run-id run-abc-123 \
   --wait \
   --poll-interval 3 \
   --max-attempts 20
 
 # JSON output
-agentic-api-cli status --run-id run-abc-123 --json
+agxr status --run-id run-abc-123 --json
 ```
 
 ### Config Command
@@ -168,10 +168,10 @@ Display current configuration (with sensitive data masked).
 
 ```bash
 # Human-readable output
-agentic-api-cli config
+agxr config
 
 # JSON output
-agentic-api-cli config --json
+agxr config --json
 ```
 
 ## Examples
@@ -184,12 +184,12 @@ export KOREAI_API_KEY="your-api-key"
 export KOREAI_APP_ID="your-app-id"
 
 # 2. Execute a simple query
-agentic-api-cli execute \
+agxr execute \
   --query "What is artificial intelligence?" \
   --session-id session-001
 
 # 3. Continue the conversation
-agentic-api-cli execute \
+agxr execute \
   --query "Can you explain more about machine learning?" \
   --session-id session-001
 ```
@@ -198,7 +198,7 @@ agentic-api-cli execute \
 
 ```bash
 # 1. Start an async run
-agentic-api-cli execute \
+agxr execute \
   --query "Generate a comprehensive report" \
   --session-id session-002 \
   --async
@@ -206,17 +206,17 @@ agentic-api-cli execute \
 # Output: Run ID: run-xyz-789
 
 # 2. Check status periodically
-agentic-api-cli status --run-id run-xyz-789
+agxr status --run-id run-xyz-789
 
 # 3. Or wait for completion
-agentic-api-cli status --run-id run-xyz-789 --wait
+agxr status --run-id run-xyz-789 --wait
 ```
 
 ### Advanced Usage
 
 ```bash
 # Streaming with debug and metadata
-agentic-api-cli execute \
+agxr execute \
   --query "Explain the solar system" \
   --session-id session-003 \
   --stream tokens \
@@ -225,7 +225,7 @@ agentic-api-cli execute \
   --verbose
 
 # Async execution with auto-wait
-agentic-api-cli execute \
+agxr execute \
   --query "Complex analysis task" \
   --session-id session-004 \
   --async \
@@ -239,17 +239,17 @@ agentic-api-cli execute \
 
 ```bash
 # Development environment
-agentic-api-cli --env-name development execute \
+agxr --env-name development execute \
   --query "Test query" \
   --session-id dev-session-001
 
 # Staging environment
-agentic-api-cli --env-name staging execute \
+agxr --env-name staging execute \
   --query "Test query" \
   --session-id staging-session-001
 
 # Production (default)
-agentic-api-cli execute \
+agxr execute \
   --query "Production query" \
   --session-id prod-session-001
 ```
@@ -258,7 +258,7 @@ agentic-api-cli execute \
 
 ```bash
 # Execute and parse JSON output
-result=$(agentic-api-cli execute \
+result=$(agxr execute \
   --query "What is 2+2?" \
   --session-id script-001 \
   --json)
@@ -273,7 +273,7 @@ echo "$result" | jq '.runId'
 You can also use the classes directly in Python:
 
 ```python
-from agentic_api_cli import Config, AgenticAPIClient
+from agxr import Config, AgenticAPIClient
 
 # Create configuration
 config = Config()
@@ -316,7 +316,7 @@ client.close()
 ### Using Context Manager
 
 ```python
-from agentic_api_cli import Config, AgenticAPIClient
+from agxr import Config, AgenticAPIClient
 
 config = Config()
 config.api_key = "your-api-key"
@@ -334,7 +334,7 @@ with AgenticAPIClient(config) as client:
 ### Error Handling
 
 ```python
-from agentic_api_cli import (
+from agxr import (
     Config,
     AgenticAPIClient,
     AgenticAPIError,
@@ -388,10 +388,10 @@ Available for all commands:
 
 ```bash
 # Check your configuration
-agentic-api-cli config
+agxr config
 
 # Use verbose mode to see what's happening
-agentic-api-cli --verbose execute --query "test" --session-id test
+agxr --verbose execute --query "test" --session-id test
 ```
 
 ### Authentication Errors
@@ -401,27 +401,27 @@ agentic-api-cli --verbose execute --query "test" --session-id test
 echo $KOREAI_API_KEY
 
 # Try with explicit API key
-agentic-api-cli --api-key YOUR_KEY execute --query "test" --session-id test
+agxr --api-key YOUR_KEY execute --query "test" --session-id test
 ```
 
 ### Timeout Issues
 
 ```bash
 # Increase timeout
-agentic-api-cli --timeout 60 execute --query "complex query" --session-id test
+agxr --timeout 60 execute --query "complex query" --session-id test
 
 # Or use async mode
-agentic-api-cli execute --query "complex query" --session-id test --async --wait
+agxr execute --query "complex query" --session-id test --async --wait
 ```
 
 ## Getting Help
 
 ```bash
 # General help
-agentic-api-cli --help
+agxr --help
 
 # Command-specific help
-agentic-api-cli execute --help
-agentic-api-cli status --help
-agentic-api-cli config --help
+agxr execute --help
+agxr status --help
+agxr config --help
 ```

@@ -4,7 +4,7 @@ Unit tests for custom exceptions.
 
 import pytest
 
-from agentic_api_cli.exceptions import (
+from agxr.exceptions import (
     AgenticAPIError,
     APIRequestError,
     APIResponseError,

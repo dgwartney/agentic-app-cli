@@ -4,7 +4,7 @@ include LICENSE
 include CHANGELOG.md
 
 # Include type information
-include agentic_api_cli/py.typed
+include agxr/py.typed
 
 # Exclude unnecessary files from distribution
 global-exclude __pycache__

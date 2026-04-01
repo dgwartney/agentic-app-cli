@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from agentic_api_cli.logging_config import (
+from agxr.logging_config import (
     LOGGER_NAME,
     SensitiveDataFilter,
     get_logger,

@@ -9,8 +9,8 @@ from unittest.mock import patch
 
 import pytest
 
-from agentic_api_cli.config import Config
-from agentic_api_cli.exceptions import ConfigurationError
+from agxr.config import Config
+from agxr.exceptions import ConfigurationError
 
 
 @pytest.fixture(autouse=True)
@@ -21,7 +21,7 @@ def prevent_dotenv_autoload(monkeypatch):
         monkeypatch.delenv(key, raising=False)
 
     # Mock load_dotenv to prevent loading project .env file
-    with patch('agentic_api_cli.config.load_dotenv'):
+    with patch('agxr.config.load_dotenv'):
         yield
 
 
@@ -76,7 +76,7 @@ class TestConfig:
             )
 
             # Temporarily unpatch to allow real dotenv loading
-            with patch('agentic_api_cli.config.load_dotenv', real_load_dotenv):
+            with patch('agxr.config.load_dotenv', real_load_dotenv):
                 config = Config(env_file=str(env_file))
 
             assert config._api_key == "file-key"

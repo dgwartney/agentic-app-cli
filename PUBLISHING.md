@@ -1,6 +1,6 @@
 # Publishing Guide
 
-This document provides instructions for publishing `agentic-api-cli` to PyPI.
+This document provides instructions for publishing `agxr` to PyPI.
 
 ## Prerequisites
 
@@ -34,8 +34,8 @@ Before publishing, ensure:
 - [ ] Version number is updated in `pyproject.toml`
 - [ ] `CHANGELOG.md` is updated with release notes
 - [ ] All tests pass: `uv run pytest`
-- [ ] Type checking passes: `uv run mypy agentic_api_cli`
-- [ ] Linting passes: `uv run ruff check agentic_api_cli`
+- [ ] Type checking passes: `uv run mypy agxr`
+- [ ] Linting passes: `uv run ruff check agxr`
 - [ ] Package builds successfully: `uv build`
 - [ ] README.md is accurate and complete
 - [ ] LICENSE file is present and correct
@@ -55,8 +55,8 @@ uv build
 ```
 
 This creates:
-- `dist/agentic_api_cli-X.Y.Z.tar.gz` (source distribution)
-- `dist/agentic_api_cli-X.Y.Z-py3-none-any.whl` (wheel)
+- `dist/agxr-X.Y.Z.tar.gz` (source distribution)
+- `dist/agxr-X.Y.Z-py3-none-any.whl` (wheel)
 
 ## Testing the Build
 
@@ -70,10 +70,10 @@ uv venv test-env
 source test-env/bin/activate
 
 # Install from wheel
-uv pip install dist/agentic_api_cli-0.1.0-py3-none-any.whl
+uv pip install dist/agxr-0.1.0-py3-none-any.whl
 
 # Test the command
-agentic-api-cli
+agxr
 
 # Clean up
 deactivate
@@ -95,7 +95,7 @@ twine upload --repository testpypi dist/*
 ### Install from TestPyPI
 
 ```bash
-pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ agentic-api-cli
+pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ agxr
 ```
 
 Note: `--extra-index-url` is needed because dependencies are on PyPI, not TestPyPI.
@@ -129,8 +129,8 @@ After publishing:
 
 3. **Verify Installation**: Test installation from PyPI
    ```bash
-   pip install agentic-api-cli
-   agentic-api-cli
+   pip install agxr
+   agxr
    ```
 
 4. **Update Documentation**: Ensure all documentation references the correct version
@@ -141,7 +141,7 @@ For subsequent releases, update the version:
 
 1. Update version in `pyproject.toml`
 2. Update `CHANGELOG.md` with new changes
-3. Update version in `agentic_api_cli/__init__.py` (if manually set)
+3. Update version in `agxr/__init__.py` (if manually set)
 4. Commit changes
 5. Follow publishing process
 
@@ -188,10 +188,10 @@ jobs:
 
 ```bash
 # Verify package structure
-tar -tzf dist/agentic_api_cli-X.Y.Z.tar.gz
+tar -tzf dist/agxr-X.Y.Z.tar.gz
 
 # Check wheel contents
-unzip -l dist/agentic_api_cli-X.Y.Z-py3-none-any.whl
+unzip -l dist/agxr-X.Y.Z-py3-none-any.whl
 ```
 
 ### Upload Issues
@@ -207,7 +207,7 @@ unzip -l dist/agentic_api_cli-X.Y.Z-py3-none-any.whl
 pip cache purge
 
 # Install with verbose output
-pip install -v agentic-api-cli
+pip install -v agxr
 ```
 
 ## Resources
