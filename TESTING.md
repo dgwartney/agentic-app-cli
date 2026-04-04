@@ -6,6 +6,8 @@ End-to-end testing of Kore.ai agentic agents using pytest.
 
 `AgentTestSession` is a lightweight wrapper around the `agxr` API client that provides a simple `send(message) -> str` interface for testing agent behavior. Tests make **real API calls** to the agent platform, validating actual agent responses just like a live user chatting.
 
+On initialization, `AgentTestSession` calls the Kore.ai Sessions API to create a real server-side session. The `session_id` property returns the API-assigned `sessionReference` that identifies this session on the server. This ensures proper server-side memory management: `reset()` performs a true server-side context reset (terminate + recreate), and `close()` terminates the session to free server resources.
+
 ## Prerequisites
 
 You need a configured profile with valid credentials:
@@ -49,15 +51,17 @@ pytest tests/e2e/ --agent-profile staging
 
 ## Class API
 
-### `AgentTestSession(profile: str)`
+### `AgentTestSession(profile: Optional[str] = None)`
 
-Creates a test session using the specified configuration profile.
+Creates a test session using the specified configuration profile. If `profile` is `None`, credentials are loaded from environment variables (`KOREAI_API_KEY`, `KOREAI_APP_ID`, `KOREAI_ENV_NAME`).
+
+On construction, the Kore.ai Sessions API is called to create a server-side session.
 
 ```python
 session = AgentTestSession(profile="staging")
 ```
 
-Or as a context manager:
+Or as a context manager (recommended — ensures the session is properly terminated):
 
 ```python
 with AgentTestSession(profile="staging") as session:
@@ -75,7 +79,7 @@ assert "4" in response
 
 ### `reset()`
 
-Starts a fresh session with a new session ID and clears conversation history. The agent will not remember previous messages.
+Performs a full server-side context reset: terminates the current Kore.ai session (clearing all server-side agent memory) and creates a new one. The agent will not remember previous messages after `reset()`.
 
 ```python
 session.send("My name is Bob")
@@ -86,13 +90,13 @@ response = session.send("What is my name?")
 
 ### `close()`
 
-Closes the underlying HTTP session. Called automatically when using the context manager.
+Terminates the Kore.ai session (freeing server-side resources) and closes the underlying HTTP connection pool. Called automatically when using the context manager.
 
 ### Properties
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `session_id` | `str` | Current session ID (format: `test-{uuid4}`) |
+| `session_id` | `str` | API-assigned `sessionReference` from the Kore.ai Sessions API |
 | `last_response_raw` | `dict \| None` | Full API response from the last `send()` call |
 | `history` | `list[dict]` | Conversation history: `[{"role": "user"\|"agent", "text": "..."}]` |
 

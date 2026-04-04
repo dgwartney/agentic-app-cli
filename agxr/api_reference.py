@@ -54,6 +54,13 @@ class SessionIdentityType(str, Enum):
     SESSION_REFERENCE = "sessionReference"
 
 
+class SessionStatus(str, Enum):
+    """Status of a conversation session"""
+    IDLE = "idle"      # Session is ready to receive input
+    BUSY = "busy"      # Session is currently processing a request
+    ERROR = "error"    # Session encountered an error
+
+
 class InputType(str, Enum):
     """Type of input content"""
     TEXT = "text"
@@ -150,6 +157,75 @@ class FindRunStatusRequest(TypedDict, total=False):
     This endpoint typically uses an empty request body or {}.
     """
     pass
+
+
+class CreateSessionRequest(TypedDict, total=False):
+    """
+    Request body for POST /apps/<AppID>/environments/<EnvName>/sessions
+
+    Attributes:
+        sessionIdentity: Array of identity objects identifying or creating the session.
+            Supports userReference (highest priority), sessionReference, or sessionIdentity types.
+        source: Optional origin system identifier for analytics (e.g. "AP", "AIS-AA").
+            Defaults to "AP" if not provided.
+    """
+    sessionIdentity: list[SessionIdentityItem]  # Required
+    source: str
+
+
+class TerminateSessionRequest(TypedDict):
+    """
+    Request body for POST /apps/<AppID>/environments/<EnvName>/sessions/terminate
+
+    Attributes:
+        sessionIdentity: Array with type (sessionReference or sessionId) and value
+            identifying the session to terminate.
+    """
+    sessionIdentity: list[SessionIdentityItem]
+
+
+class FileUploadConfig(TypedDict, total=False):
+    """
+    File upload configuration returned by the Sessions API.
+
+    Attributes:
+        enabled: Whether file uploads are allowed in this session
+        maxFileCount: Maximum number of files that can be uploaded
+        maxFileSize: Maximum file size in megabytes
+        maxTokens: Maximum token count for uploaded content
+    """
+    enabled: bool
+    maxFileCount: int
+    maxFileSize: float
+    maxTokens: int
+
+
+class SessionResponse(TypedDict, total=False):
+    """
+    Response from the Sessions API (create or terminate).
+
+    Attributes:
+        sessionId: Kore.ai internal session identifier
+        status: Current session status (idle, busy, error)
+        sessionReference: Client-facing session reference, used in subsequent API calls
+        userReference: Client-facing user reference
+        userId: Kore.ai internal user identifier
+        appId: Application identifier
+        createdAt: ISO 8601 timestamp of session creation
+        allowedMimeTypes: List of MIME types permitted for file uploads in this session
+        fileUploadConfig: File upload rules and limits for this session
+        attachments: List of files currently attached to the session
+    """
+    sessionId: str
+    status: str                        # idle, busy, error
+    sessionReference: str
+    userReference: str
+    userId: str
+    appId: str
+    createdAt: str
+    allowedMimeTypes: list[str]
+    fileUploadConfig: FileUploadConfig
+    attachments: list[dict[str, Any]]
 
 
 # ============================================================================
@@ -255,6 +331,42 @@ class ErrorResponse(TypedDict):
 # ============================================================================
 # URL Builders
 # ============================================================================
+
+def build_sessions_url(app_id: str, env_name: str) -> str:
+    """
+    Build URL for the sessions create endpoint.
+
+    Args:
+        app_id: Unique identifier for the agentic application
+        env_name: Environment name (e.g., "production", "staging", "draft")
+
+    Returns:
+        Full URL for the POST /sessions endpoint
+
+    Example:
+        >>> build_sessions_url("my-app-123", "production")
+        'https://agent-platform.kore.ai/api/v2/apps/my-app-123/environments/production/sessions'
+    """
+    return f"{BASE_URL}/apps/{app_id}/environments/{env_name}/sessions"
+
+
+def build_terminate_session_url(app_id: str, env_name: str) -> str:
+    """
+    Build URL for the sessions terminate endpoint.
+
+    Args:
+        app_id: Unique identifier for the agentic application
+        env_name: Environment name (e.g., "production", "staging", "draft")
+
+    Returns:
+        Full URL for the POST /sessions/terminate endpoint
+
+    Example:
+        >>> build_terminate_session_url("my-app-123", "production")
+        'https://agent-platform.kore.ai/api/v2/apps/my-app-123/environments/production/sessions/terminate'
+    """
+    return f"{BASE_URL}/apps/{app_id}/environments/{env_name}/sessions/terminate"
+
 
 def build_execute_url(app_id: str, env_name: str) -> str:
     """

@@ -6,6 +6,7 @@
 
 - **Interactive Chat Mode**: REPL-style chat interface with session management and special commands
 - **Special Commands**: Runtime control with `#help`, `#new`, `#info`, `#clear`, `#debug`, `#stream` commands
+- **MCP Server**: Expose your agent as MCP tools so Claude Code can interact with it directly
 - **Profile Management**: Store and manage multiple configuration sets for different environments
 - **Execute AI agent runs**: Synchronous or asynchronous execution modes
 - **Real-time streaming**: Stream responses token-by-token, by message, or with custom events
@@ -13,6 +14,7 @@
 - **Enhanced debug modes**: Comprehensive debugging with `all`, `function-call`, and `thoughts` modes
 - **Advanced logging**: Python standard library logging with file output and configurable log levels
 - **File attachments**: Support for attaching files to requests
+- **Server-side session lifecycle**: Full Sessions API integration — create, use, and terminate sessions for proper memory management
 - **Session management**: Maintain conversation continuity across requests
 - **Flexible configuration**: Multiple configuration methods with clear precedence rules
 - **Secure storage**: Profiles stored with proper file permissions (0600/0700)
@@ -460,10 +462,63 @@ execute_url = build_execute_url(app_id="my-app", env_name="production")
 headers = build_headers(api_key="your-api-key")
 ```
 
+## MCP Server
+
+`agxr-mcp` exposes your Kore.ai agent as MCP tools so Claude Code (or any MCP client) can interact with it directly.
+
+### Start the MCP server
+
+```bash
+# Using a named profile
+agxr-mcp --profile my-profile
+
+# Using environment variables (KOREAI_API_KEY, KOREAI_APP_ID, KOREAI_ENV_NAME)
+agxr-mcp
+```
+
+### Add to Claude Code
+
+Add to `~/.claude/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "agxr": {
+      "command": "uv",
+      "args": ["run", "agxr-mcp", "--profile", "my-profile"],
+      "cwd": "/path/to/agentic-app-cli"
+    }
+  }
+}
+```
+
+### Available MCP Tools
+
+| Tool | Description |
+|------|-------------|
+| `start_session` | Create a new conversation session; returns `mcp_session_id` |
+| `end_session` | Terminate a session and free server-side memory |
+| `send_message` | Send a message to the agent in an existing session |
+| `get_session_history` | Return the full conversation history for a session |
+| `reset_session` | Clear local conversation history (session stays active) |
+| `execute_query` | One-shot query without creating a persistent session |
+| `check_run_status` | Poll the status of an asynchronous run |
+| `list_profiles` | List available configuration profiles |
+| `get_server_info` | Return app ID, env name, and active session count |
+
+### Typical session flow
+
+```
+start_session → send_message (×N) → end_session
+```
+
+For stateless single-turn interactions, use `execute_query` directly.
+
 ## Documentation
 
 - [API Documentation](https://docs.kore.ai/agentic-platform/)
 - [Type Reference](./agxr/api_reference.py)
+- [Usage Guide](./USAGE.md) — Full CLI and Python API reference
 - [Testing Guide](./TESTING.md) — End-to-end agent testing with `AgentTestSession`
 
 ## Requirements

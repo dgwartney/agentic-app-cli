@@ -34,7 +34,9 @@ from agxr.exceptions import (
     TimeoutError,
     ValidationError,
 )
+from agxr.mcp_server import AgentSession, AgenticMCPServer
 from agxr.profiles import ProfileManager
+from agxr.testing import AgentTestSession
 
 __all__ = [
     "__version__",
@@ -50,6 +52,9 @@ __all__ = [
     "Config",
     "AgenticAPIClient",
     "ProfileManager",
+    "AgentTestSession",
+    "AgentSession",
+    "AgenticMCPServer",
     # Exceptions
     "AgenticAPIError",
     "AuthenticationError",

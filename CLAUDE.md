@@ -75,11 +75,19 @@ This CLI tool integrates with the Kore.ai Agentic App Platform API to execute an
 
 ### API Endpoints
 
-1. **Execute Run**: `POST /apps/<AppID>/environments/<EnvName>/runs/execute`
-   - Execute agentic app with query or direct agent invocation
-   - Supports streaming, debug modes, file attachments
+1. **Create Session**: `POST /apps/<AppID>/environments/<EnvName>/sessions`
+   - Creates a server-side session; returns `sessionReference`, `sessionId`, `status`
+   - `sessionReference` is the key identifier used in all subsequent execute calls
 
-2. **Find Run Status**: `POST /apps/<AppID>/environments/<EnvName>/runs/<runId>/status`
+2. **Terminate Session**: `POST /apps/<AppID>/environments/<EnvName>/sessions/terminate`
+   - Terminates a session and clears all server-side agent memory
+   - Body: `{"sessionIdentity": [{"type": "sessionReference", "value": "..."}]}`
+
+3. **Execute Run**: `POST /apps/<AppID>/environments/<EnvName>/runs/execute`
+   - Execute agentic app with query or direct agent invocation
+   - Supports streaming, debug modes, file attachments, `isAsync`, `callbackUrl`, `callbackToken`
+
+4. **Find Run Status**: `POST /apps/<AppID>/environments/<EnvName>/runs/<runId>/status`
    - Check status of asynchronous runs
    - Returns pending/running/success/failed status
 
@@ -235,3 +243,14 @@ The following features are planned for future implementation:
 - Shows confirmation banner with previous and new session IDs
 - Clears conversation history for fresh start
 - Logged for debugging purposes
+
+### ✅ Task 8: Unified API Client + MCP Server
+- Refactored `AgenticAPIClient` to cover all 4 Kore.ai REST endpoints (Sessions + Execute + Status)
+- `create_session(user_reference)` — creates server-side session, returns `sessionReference`
+- `terminate_session(session_reference)` — terminates session and clears server-side agent memory
+- `execute_run()` extended with optional `is_async`, `callback_url`, `callback_token` parameters
+- `AgentTestSession` refactored to use Sessions API lifecycle (true server-side reset on `reset()`)
+- New `AgenticMCPServer` (FastMCP-based) with 9 MCP tools: `start_session`, `end_session`, `send_message`, `get_session_history`, `reset_session`, `execute_query`, `check_run_status`, `list_profiles`, `get_server_info`
+- New `AgentSession` class for MCP-level session state
+- New `agxr-mcp` CLI entry point
+- 298 tests passing; `mcp_server.py` at 95%, `testing.py` at 100%, `api_reference.py` at 100%

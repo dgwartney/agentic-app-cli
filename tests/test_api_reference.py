@@ -8,12 +8,15 @@ from agxr.api_reference import (
     BASE_URL,
     DebugMode,
     RunStatus,
+    SessionStatus,
     StreamMode,
     build_execute_url,
     build_headers,
     build_input,
     build_session_identity,
+    build_sessions_url,
     build_status_url,
+    build_terminate_session_url,
 )
 
 
@@ -42,6 +45,12 @@ class TestConstants:
         assert RunStatus.RUNNING.value == "running"
         assert RunStatus.SUCCESS.value == "success"
         assert RunStatus.FAILED.value == "failed"
+
+    def test_session_status_enum(self):
+        """Test SessionStatus enum values."""
+        assert SessionStatus.IDLE.value == "idle"
+        assert SessionStatus.BUSY.value == "busy"
+        assert SessionStatus.ERROR.value == "error"
 
 
 class TestBuildExecuteUrl:
@@ -165,3 +174,75 @@ class TestBuildInput:
         result = build_input("")
 
         assert result[0] == {"type": "text", "content": ""}
+
+
+class TestBuildSessionsUrl:
+    """Test build_sessions_url function."""
+
+    def test_build_sessions_url_format(self):
+        """Test that sessions URL has correct path segments."""
+        url = build_sessions_url("my-app", "production")
+        assert "/apps/my-app/environments/production/sessions" in url
+
+    def test_build_sessions_url_includes_base(self):
+        """Test that sessions URL starts with BASE_URL."""
+        url = build_sessions_url("my-app", "production")
+        assert url.startswith(BASE_URL)
+
+    def test_build_sessions_url_exact_format(self):
+        """Test sessions URL exact format."""
+        url = build_sessions_url("app-123", "staging")
+        expected = f"{BASE_URL}/apps/app-123/environments/staging/sessions"
+        assert url == expected
+
+    def test_build_sessions_url_does_not_end_with_terminate(self):
+        """Test that sessions URL is distinct from terminate URL."""
+        url = build_sessions_url("app", "env")
+        assert not url.endswith("/terminate")
+
+
+class TestBuildTerminateSessionUrl:
+    """Test build_terminate_session_url function."""
+
+    def test_build_terminate_url_format(self):
+        """Test that terminate URL ends with /terminate."""
+        url = build_terminate_session_url("my-app", "production")
+        assert url.endswith("/terminate")
+
+    def test_build_terminate_url_includes_base(self):
+        """Test that terminate URL starts with BASE_URL."""
+        url = build_terminate_session_url("my-app", "production")
+        assert url.startswith(BASE_URL)
+
+    def test_build_terminate_url_exact_format(self):
+        """Test terminate URL exact format."""
+        url = build_terminate_session_url("app-123", "staging")
+        expected = f"{BASE_URL}/apps/app-123/environments/staging/sessions/terminate"
+        assert url == expected
+
+    def test_build_terminate_url_contains_sessions_path(self):
+        """Test that terminate URL contains /sessions/terminate."""
+        url = build_terminate_session_url("app", "env")
+        assert "/sessions/terminate" in url
+
+
+class TestSessionStatus:
+    """Test SessionStatus enum."""
+
+    def test_idle_value(self):
+        """Test idle status value."""
+        assert SessionStatus.IDLE == "idle"
+
+    def test_busy_value(self):
+        """Test busy status value."""
+        assert SessionStatus.BUSY == "busy"
+
+    def test_error_value(self):
+        """Test error status value."""
+        assert SessionStatus.ERROR == "error"
+
+    def test_is_string_comparable(self):
+        """Test that SessionStatus can be compared to plain strings."""
+        assert SessionStatus.IDLE == "idle"
+        assert SessionStatus.BUSY == "busy"
+        assert SessionStatus.ERROR == "error"

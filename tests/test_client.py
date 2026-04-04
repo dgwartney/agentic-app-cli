@@ -110,6 +110,8 @@ class TestExecuteRun:
         mock_response.status_code = 201
         mock_response.json.return_value = {"output": [], "sessionInfo": {}}
         mock_response.text = "success"
+        # Streaming calls iter_lines(); return an empty iterator to avoid processing
+        mock_response.iter_lines.return_value = iter([])
         mock_post.return_value = mock_response
 
         client.execute_run(
@@ -406,3 +408,329 @@ class TestClientContextManager:
         with patch.object(client.session, "close") as mock_close:
             client.close()
             mock_close.assert_called_once()
+
+
+class TestCreateSession:
+    """Test create_session method."""
+
+    MOCK_SESSION_RESPONSE = {
+        "sessionReference": "sr-abc123",
+        "sessionId": "si-xyz789",
+        "userReference": "user-001",
+        "userId": "uid-001",
+        "status": "idle",
+        "allowedMimeTypes": ["application/pdf", "image/png"],
+        "fileUploadConfig": {"enabled": True, "maxFileCount": 5, "maxFileSize": 10.0},
+    }
+
+    @patch("requests.Session.post")
+    def test_success_returns_session_data(self, mock_post, client):
+        """Test successful session creation returns session metadata."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = self.MOCK_SESSION_RESPONSE
+        mock_response.text = '{"sessionReference": "sr-abc123"}'
+        mock_post.return_value = mock_response
+
+        result = client.create_session("user-001")
+
+        assert result["sessionReference"] == "sr-abc123"
+        assert result["sessionId"] == "si-xyz789"
+        assert result["status"] == "idle"
+
+    def test_validation_empty_user_reference(self, client):
+        """Test that empty user_reference raises ValidationError."""
+        with pytest.raises(ValidationError) as exc_info:
+            client.create_session("")
+        assert "user_reference cannot be empty" in str(exc_info.value)
+
+    def test_validation_whitespace_user_reference(self, client):
+        """Test that whitespace-only user_reference raises ValidationError."""
+        with pytest.raises(ValidationError):
+            client.create_session("   ")
+
+    @patch("requests.Session.post")
+    def test_authentication_error_401(self, mock_post, client):
+        """Test that 401 response raises AuthenticationError."""
+        mock_response = Mock()
+        mock_response.status_code = 401
+        mock_response.text = "Unauthorized"
+        mock_post.return_value = mock_response
+
+        with pytest.raises(AuthenticationError):
+            client.create_session("user-001")
+
+    @patch("requests.Session.post")
+    def test_api_error_500(self, mock_post, client):
+        """Test that 500 response raises APIResponseError."""
+        mock_response = Mock()
+        mock_response.status_code = 500
+        mock_response.json.return_value = {"error": {"message": "Internal server error"}}
+        mock_response.text = '{"error": {"message": "Internal server error"}}'
+        mock_post.return_value = mock_response
+
+        with pytest.raises(APIResponseError):
+            client.create_session("user-001")
+
+    @patch("requests.Session.post")
+    def test_request_error_on_network_failure(self, mock_post, client):
+        """Test that network errors raise APIRequestError."""
+        mock_post.side_effect = requests.exceptions.RequestException("Connection refused")
+
+        with pytest.raises(APIRequestError):
+            client.create_session("user-001")
+
+    @patch("requests.Session.post")
+    def test_timeout_error(self, mock_post, client):
+        """Test that timeouts raise AgenticTimeoutError."""
+        from agxr.exceptions import TimeoutError as AgenticTimeoutError
+
+        mock_post.side_effect = requests.exceptions.Timeout()
+
+        with pytest.raises(AgenticTimeoutError):
+            client.create_session("user-001")
+
+    @patch("requests.Session.post")
+    def test_with_session_reference_included_in_body(self, mock_post, client):
+        """Test that session_reference is included in request body when provided."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = self.MOCK_SESSION_RESPONSE
+        mock_response.text = "success"
+        mock_post.return_value = mock_response
+
+        client.create_session("user-001", session_reference="sr-custom-123")
+
+        call_kwargs = mock_post.call_args
+        body = call_kwargs[1]["json"]
+        identity_types = [item["type"] for item in body["sessionIdentity"]]
+        assert "sessionReference" in identity_types
+
+    @patch("requests.Session.post")
+    def test_with_source_included_in_body(self, mock_post, client):
+        """Test that source is included in request body when provided."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = self.MOCK_SESSION_RESPONSE
+        mock_response.text = "success"
+        mock_post.return_value = mock_response
+
+        client.create_session("user-001", source="AIS-AA")
+
+        call_kwargs = mock_post.call_args
+        body = call_kwargs[1]["json"]
+        assert body["source"] == "AIS-AA"
+
+    @patch("requests.Session.post")
+    def test_source_omitted_when_none(self, mock_post, client):
+        """Test that source key is absent from body when not provided."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = self.MOCK_SESSION_RESPONSE
+        mock_response.text = "success"
+        mock_post.return_value = mock_response
+
+        client.create_session("user-001")
+
+        call_kwargs = mock_post.call_args
+        body = call_kwargs[1]["json"]
+        assert "source" not in body
+
+
+class TestTerminateSession:
+    """Test terminate_session method."""
+
+    MOCK_TERMINATE_RESPONSE = {
+        "status": "idle",
+        "sessionReference": "sr-abc123",
+        "userReference": "user-001",
+        "userId": "uid-001",
+        "appId": "app-001",
+        "attachments": [],
+    }
+
+    @patch("requests.Session.post")
+    def test_success_returns_response(self, mock_post, client):
+        """Test successful session termination returns metadata."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = self.MOCK_TERMINATE_RESPONSE
+        mock_response.text = "success"
+        mock_post.return_value = mock_response
+
+        result = client.terminate_session("sr-abc123")
+
+        assert result["sessionReference"] == "sr-abc123"
+
+    def test_validation_empty_session_reference(self, client):
+        """Test that empty session_reference raises ValidationError."""
+        with pytest.raises(ValidationError) as exc_info:
+            client.terminate_session("")
+        assert "session_reference cannot be empty" in str(exc_info.value)
+
+    def test_validation_whitespace_session_reference(self, client):
+        """Test that whitespace-only session_reference raises ValidationError."""
+        with pytest.raises(ValidationError):
+            client.terminate_session("   ")
+
+    @patch("requests.Session.post")
+    def test_authentication_error_401(self, mock_post, client):
+        """Test that 401 response raises AuthenticationError."""
+        mock_response = Mock()
+        mock_response.status_code = 401
+        mock_response.text = "Unauthorized"
+        mock_post.return_value = mock_response
+
+        with pytest.raises(AuthenticationError):
+            client.terminate_session("sr-abc123")
+
+    @patch("requests.Session.post")
+    def test_not_found_404(self, mock_post, client):
+        """Test that 404 response raises RunNotFoundError."""
+        mock_response = Mock()
+        mock_response.status_code = 404
+        mock_response.json.return_value = {"error": {"message": "Session not found"}}
+        mock_response.text = "not found"
+        mock_post.return_value = mock_response
+
+        with pytest.raises(RunNotFoundError):
+            client.terminate_session("sr-nonexistent")
+
+    @patch("requests.Session.post")
+    def test_api_error_500(self, mock_post, client):
+        """Test that 500 response raises APIResponseError."""
+        mock_response = Mock()
+        mock_response.status_code = 500
+        mock_response.json.return_value = {"error": {"message": "Internal server error"}}
+        mock_response.text = "error"
+        mock_post.return_value = mock_response
+
+        with pytest.raises(APIResponseError):
+            client.terminate_session("sr-abc123")
+
+    @patch("requests.Session.post")
+    def test_request_error_on_network_failure(self, mock_post, client):
+        """Test that network errors raise APIRequestError."""
+        mock_post.side_effect = requests.exceptions.RequestException("Network error")
+
+        with pytest.raises(APIRequestError):
+            client.terminate_session("sr-abc123")
+
+    @patch("requests.Session.post")
+    def test_timeout_error(self, mock_post, client):
+        """Test that timeouts raise AgenticTimeoutError."""
+        from agxr.exceptions import TimeoutError as AgenticTimeoutError
+
+        mock_post.side_effect = requests.exceptions.Timeout()
+
+        with pytest.raises(AgenticTimeoutError):
+            client.terminate_session("sr-abc123")
+
+    @patch("requests.Session.post")
+    def test_body_uses_session_reference_type(self, mock_post, client):
+        """Test that request body uses sessionReference identity type."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = self.MOCK_TERMINATE_RESPONSE
+        mock_response.text = "success"
+        mock_post.return_value = mock_response
+
+        client.terminate_session("sr-abc123")
+
+        call_kwargs = mock_post.call_args
+        body = call_kwargs[1]["json"]
+        assert body["sessionIdentity"][0]["type"] == "sessionReference"
+        assert body["sessionIdentity"][0]["value"] == "sr-abc123"
+
+
+class TestExecuteRunExtensions:
+    """Test new optional parameters added to execute_run."""
+
+    MOCK_EXECUTE_RESPONSE = {
+        "output": [{"type": "text", "content": "Hello!"}],
+        "sessionInfo": {"runId": "r-001", "status": "idle"},
+    }
+
+    @patch("requests.Session.post")
+    def test_is_async_true_adds_field_to_body(self, mock_post, client):
+        """Test that is_async=True adds isAsync: True to request body."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = self.MOCK_EXECUTE_RESPONSE
+        mock_response.text = "success"
+        mock_post.return_value = mock_response
+
+        client.execute_run("Hello", "session-1", is_async=True)
+
+        call_kwargs = mock_post.call_args
+        body = call_kwargs[1]["json"]
+        assert body.get("isAsync") is True
+
+    @patch("requests.Session.post")
+    def test_is_async_false_omits_field_from_body(self, mock_post, client):
+        """Test that is_async=False (default) does not add isAsync to body."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = self.MOCK_EXECUTE_RESPONSE
+        mock_response.text = "success"
+        mock_post.return_value = mock_response
+
+        client.execute_run("Hello", "session-1")
+
+        call_kwargs = mock_post.call_args
+        body = call_kwargs[1]["json"]
+        assert "isAsync" not in body
+
+    @patch("requests.Session.post")
+    def test_callback_url_included_in_body(self, mock_post, client):
+        """Test that callback_url is included in body when provided."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = self.MOCK_EXECUTE_RESPONSE
+        mock_response.text = "success"
+        mock_post.return_value = mock_response
+
+        client.execute_run(
+            "Hello", "session-1",
+            is_async=True,
+            callback_url="https://example.com/callback",
+        )
+
+        call_kwargs = mock_post.call_args
+        body = call_kwargs[1]["json"]
+        assert body.get("callbackUrl") == "https://example.com/callback"
+
+    @patch("requests.Session.post")
+    def test_callback_token_included_in_body(self, mock_post, client):
+        """Test that callback_token is included in body when provided."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = self.MOCK_EXECUTE_RESPONSE
+        mock_response.text = "success"
+        mock_post.return_value = mock_response
+
+        client.execute_run(
+            "Hello", "session-1",
+            is_async=True,
+            callback_token="my-secret-token",
+        )
+
+        call_kwargs = mock_post.call_args
+        body = call_kwargs[1]["json"]
+        assert body.get("callbackToken") == "my-secret-token"
+
+    @patch("requests.Session.post")
+    def test_callback_omitted_when_none(self, mock_post, client):
+        """Test that callbackUrl and callbackToken are absent when not provided."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = self.MOCK_EXECUTE_RESPONSE
+        mock_response.text = "success"
+        mock_post.return_value = mock_response
+
+        client.execute_run("Hello", "session-1")
+
+        call_kwargs = mock_post.call_args
+        body = call_kwargs[1]["json"]
+        assert "callbackUrl" not in body
+        assert "callbackToken" not in body
