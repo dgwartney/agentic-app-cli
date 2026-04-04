@@ -202,6 +202,111 @@ def test_standalone():
         assert len(response) > 0
 ```
 
+## Evaluating Agent Responses with deepeval
+
+For assertions beyond simple string matching, [deepeval](https://github.com/confident-ai/deepeval) provides LLM-as-judge evaluation — define quality criteria in plain English and let an LLM score the response.
+
+### Install
+
+```bash
+pip install deepeval
+```
+
+deepeval requires an OpenAI API key for its evaluation LLM:
+
+```bash
+export OPENAI_API_KEY="your-openai-api-key"
+```
+
+### Basic Usage
+
+```python
+from deepeval import assert_test
+from deepeval.metrics import GEval
+from deepeval.test_case import LLMTestCase, LLMTestCaseParams
+
+
+def test_helpful_greeting(agent_session):
+    response = agent_session.send("Hello")
+    metric = GEval(
+        name="Helpfulness",
+        criteria="The response is a helpful greeting that offers assistance.",
+        evaluation_params=[LLMTestCaseParams.ACTUAL_OUTPUT],
+        threshold=0.5,
+    )
+    assert_test(LLMTestCase(input="Hello", actual_output=response), [metric])
+```
+
+### Custom Evaluation Criteria
+
+Define any criteria in plain English:
+
+```python
+def test_professional_tone(agent_session):
+    response = agent_session.send("I need help with my account")
+    metric = GEval(
+        name="Professionalism",
+        criteria="The response uses a professional, empathetic tone appropriate for customer support.",
+        evaluation_params=[LLMTestCaseParams.ACTUAL_OUTPUT],
+        threshold=0.7,
+    )
+    assert_test(LLMTestCase(input="I need help with my account", actual_output=response), [metric])
+```
+
+### Evaluating Against Expected Output
+
+Check if the response matches an expected answer:
+
+```python
+def test_factual_answer(agent_session):
+    response = agent_session.send("What are your business hours?")
+    metric = GEval(
+        name="Correctness",
+        criteria="The response accurately states the business hours and matches the expected information.",
+        evaluation_params=[LLMTestCaseParams.ACTUAL_OUTPUT, LLMTestCaseParams.EXPECTED_OUTPUT],
+        threshold=0.7,
+    )
+    assert_test(
+        LLMTestCase(
+            input="What are your business hours?",
+            actual_output=response,
+            expected_output="Our business hours are Monday to Friday, 9 AM to 5 PM.",
+        ),
+        [metric],
+    )
+```
+
+### Multiple Criteria in One Test
+
+Apply several metrics to a single response:
+
+```python
+def test_comprehensive_response(agent_session):
+    question = "How do I reset my password?"
+    response = agent_session.send(question)
+
+    relevance = GEval(
+        name="Relevance",
+        criteria="The response directly addresses the password reset question.",
+        evaluation_params=[LLMTestCaseParams.ACTUAL_OUTPUT],
+        threshold=0.7,
+    )
+    clarity = GEval(
+        name="Clarity",
+        criteria="The response provides clear, step-by-step instructions.",
+        evaluation_params=[LLMTestCaseParams.ACTUAL_OUTPUT],
+        threshold=0.6,
+    )
+    assert_test(LLMTestCase(input=question, actual_output=response), [relevance, clarity])
+```
+
+### Notes
+
+- Each evaluation call costs ~$0.01-0.05 (OpenAI API usage)
+- The `threshold` (0.0-1.0) controls how strict the evaluation is
+- `assert_test` raises `AssertionError` on failure with detailed scoring output
+- Run with `pytest -s` to see evaluation scores in the output
+
 ## Tips
 
 - **Each test gets a fresh session** via the `agent_session` fixture, so tests are isolated by default.
