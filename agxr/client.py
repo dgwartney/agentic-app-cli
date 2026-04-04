@@ -561,7 +561,13 @@ class AgenticAPIClient:
                     status_code=response.status_code,
                 )
 
-            return response.json()
+            raw = response.json()
+            # Normalize: some environments wrap session data in a "session" key
+            session_data = raw.get("session", raw)
+            # Normalize: fall back to sessionId when sessionReference is null/absent
+            if not session_data.get("sessionReference"):
+                session_data["sessionReference"] = session_data.get("sessionId", "")
+            return session_data
 
         except (AuthenticationError, APIResponseError):
             raise
