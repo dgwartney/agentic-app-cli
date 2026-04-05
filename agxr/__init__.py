@@ -5,7 +5,7 @@ A Python CLI tool for interacting with the Kore.ai Agentic App Platform API.
 Supports executing AI agent runs, streaming responses, and managing async operations.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __author__ = "David Gwartney"
 __email__ = "david.gwartney@gmail.com"
 

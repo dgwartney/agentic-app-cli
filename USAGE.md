@@ -191,7 +191,13 @@ agxr-mcp
 
 ### Claude Code integration
 
-Add to `~/.claude/settings.json`:
+Register the server using the `claude` CLI (user-level, available in all projects):
+
+```bash
+claude mcp add -s user agxr -- uv run agxr-mcp --profile my-profile
+```
+
+Or for project-level registration, create `.mcp.json` in your consumer project directory:
 
 ```json
 {
@@ -199,11 +205,13 @@ Add to `~/.claude/settings.json`:
     "agxr": {
       "command": "uv",
       "args": ["run", "agxr-mcp", "--profile", "my-profile"],
-      "cwd": "/path/to/agentic-app-cli"
+      "cwd": "/path/to/consumer/project"
     }
   }
 }
 ```
+
+Then open Claude Code from that directory — it will detect `.mcp.json` automatically.
 
 ### Tools
 

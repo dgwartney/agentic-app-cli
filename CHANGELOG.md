@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.3.0] - 2026-04-04
+## [0.2.0] - 2026-04-04
 
 ### Added
 - **MCP Server** (`agxr-mcp`): FastMCP-based server exposing 9 MCP tools for Claude Code integration
@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `create_session(user_reference, ...)` — `POST /sessions`
   - `terminate_session(session_reference)` — `POST /sessions/terminate`
 - **`AgentSession`** class for MCP-level session state management
+- **Interactive Chat Mode**: REPL-style chat interface with persistent sessions and auto-generated session IDs
+- **Special Commands**: Runtime control with `#help`, `#new`, `#info`, `#clear`, `#debug`, `#stream`
+- **Profile Management**: Store and manage multiple credential sets in `~/.kore/profiles`
+- **Enhanced Debug Modes**: `all`, `function-call`, and `thoughts` debug modes via `--debug-mode`
+- **Advanced Logging**: Python standard library logging with `--log-file` and `--log-level`
 - `fastmcp>=2.0` dependency; `agxr-mcp` CLI entry point in `pyproject.toml`
 - New `SessionStatus` enum, `SessionResponse`, `CreateSessionRequest`, `TerminateSessionRequest` TypedDicts in `api_reference.py`
 - `build_sessions_url()` and `build_terminate_session_url()` URL builder functions
@@ -30,6 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `close()` terminates the Kore.ai session before closing the HTTP client
   - `profile` parameter type changed from `str` to `Optional[str]` (env vars supported)
 - Exports `AgentTestSession`, `AgentSession`, `AgenticMCPServer` from `agxr.__init__`
+
+### Fixed
+- `create_session()` now handles environments (e.g. UAT_Chat) that wrap the response under a
+  `"session"` key and return `sessionReference: null` — falls back to `sessionId` automatically
 
 ## [0.1.0] - 2026-02-12
 
@@ -51,5 +60,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Usage examples in README
 - Development setup instructions
 
-[Unreleased]: https://github.com/dgwartney/agentic-app-cli/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/dgwartney/agentic-app-cli/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/dgwartney/agentic-app-cli/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/dgwartney/agentic-app-cli/releases/tag/v0.1.0

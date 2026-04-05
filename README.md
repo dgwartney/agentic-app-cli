@@ -478,7 +478,13 @@ agxr-mcp
 
 ### Add to Claude Code
 
-Add to `~/.claude/settings.json`:
+Register the server using the `claude` CLI (user-level, available in all projects):
+
+```bash
+claude mcp add -s user agxr -- uv run agxr-mcp --profile my-profile
+```
+
+Or for project-level registration, create `.mcp.json` in your project directory:
 
 ```json
 {
@@ -486,11 +492,13 @@ Add to `~/.claude/settings.json`:
     "agxr": {
       "command": "uv",
       "args": ["run", "agxr-mcp", "--profile", "my-profile"],
-      "cwd": "/path/to/agentic-app-cli"
+      "cwd": "/path/to/consumer/project"
     }
   }
 }
 ```
+
+Then open Claude Code from that directory — it will detect `.mcp.json` automatically.
 
 ### Available MCP Tools
 
@@ -542,42 +550,4 @@ For issues and questions:
 
 ## Changelog
 
-### 0.5.0 (Chat Mode & Special Commands)
-
-- **Interactive Chat Mode**: REPL-style chat interface with persistent sessions
-- **Special Commands**: Runtime control commands (`#help`, `#new`, `#info`, `#clear`, `#debug`, `#stream`)
-- **Session Management**: Auto-generated session IDs with ability to start fresh sessions
-- **Toggle Settings**: Change debug and streaming modes without restarting chat
-- **Improved UX**: Case-insensitive commands, helpful error messages, discoverable features
-
-### 0.4.0 (Enhanced Debug & Logging)
-
-- **Debug Modes**: Support for `all`, `function-call`, and `thoughts` debug modes
-- **Advanced Logging**: Python standard library logging with file output
-- **Log Levels**: Configurable log levels (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-- **Secure Logging**: Automatic masking of sensitive data in logs
-- **Verbose Output**: Enhanced verbose mode with detailed debug information
-
-### 0.3.0 (Profile Management)
-
-- **Profile Management**: Add, list, delete, and manage configuration profiles
-- **Default Profiles**: Set a default profile to use automatically
-- **Secure Storage**: Profiles stored in `~/.kore/` with secure permissions (0600)
-- **Configuration Precedence**: Clear precedence rules (CLI args > Env vars > Profiles > Defaults)
-- **Interactive Profile Creation**: Create profiles interactively or via CLI arguments
-- **Profile Display**: List profiles with masked or full API keys
-
-### 0.2.0 (Streaming & Session Support)
-
-- **Real-time Streaming**: Token-by-token, message, and custom event streaming
-- **Session Identity**: Maintain conversation continuity across requests
-- **Async Execution**: Asynchronous run execution with status polling
-- **Enhanced Error Handling**: Better error messages and recovery
-
-### 0.1.0 (Initial Release)
-
-- Initial package structure
-- API type definitions and reference implementation
-- Basic CLI framework
-- Execute and status commands
-- Documentation and examples
+See [CHANGELOG.md](./CHANGELOG.md) for the full version history.
