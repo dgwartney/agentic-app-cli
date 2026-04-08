@@ -50,6 +50,7 @@ class RunStatus(str, Enum):
 
 class SessionIdentityType(str, Enum):
     """Type of session identity"""
+    SESSION_ID = "sessionId"
     USER_REFERENCE = "userReference"
     SESSION_REFERENCE = "sessionReference"
 
@@ -434,22 +435,32 @@ def build_headers(api_key: str) -> dict[str, str]:
 # Helper Functions
 # ============================================================================
 
-def build_session_identity(user_ref: str, session_ref: Optional[str] = None) -> list[SessionIdentityItem]:
+def build_session_identity(
+    user_ref: str,
+    session_ref: Optional[str] = None,
+    session_id: Optional[str] = None,
+) -> list[SessionIdentityItem]:
     """
-    Build sessionIdentity array from user and session references.
+    Build sessionIdentity array using priority-based session resolution.
+
+    Per the Kore.ai session resolution docs, identifiers are checked in priority order:
+      1. sessionId (highest) — retrieves an existing session only
+      2. sessionReference (medium) — finds or creates a session
+      3. userReference (lowest) — always creates a new session
 
     Args:
-        user_ref: User reference value
-        session_ref: Session reference value (optional)
+        user_ref: User reference value (always included for ownership validation)
+        session_ref: Session reference value (used if session_id not provided)
+        session_id: Session ID value (highest priority; preferred over session_ref)
 
     Returns:
         List of session identity items
 
     Example:
-        >>> build_session_identity("user-123", "session-456")
+        >>> build_session_identity("user-123", session_id="s-abc")
         [
             {'type': 'userReference', 'value': 'user-123'},
-            {'type': 'sessionReference', 'value': 'session-456'}
+            {'type': 'sessionId', 'value': 's-abc'}
         ]
     """
     identity: list[SessionIdentityItem] = [
@@ -459,7 +470,12 @@ def build_session_identity(user_ref: str, session_ref: Optional[str] = None) -> 
         }
     ]
 
-    if session_ref:
+    if session_id:
+        identity.append({
+            "type": SessionIdentityType.SESSION_ID.value,
+            "value": session_id
+        })
+    elif session_ref:
         identity.append({
             "type": SessionIdentityType.SESSION_REFERENCE.value,
             "value": session_ref

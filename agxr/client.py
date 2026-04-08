@@ -5,6 +5,7 @@ Provides a class-based interface for making API requests using the ACTUAL
 API format (not the initially documented format which was inaccurate).
 """
 
+import json
 import time
 from typing import Any, Optional
 
@@ -71,6 +72,8 @@ class AgenticAPIClient:
         is_async: bool = False,
         callback_url: Optional[str] = None,
         callback_token: Optional[str] = None,
+        show_payloads: bool = False,
+        session_id: Optional[str] = None,
     ) -> dict[str, Any]:
         """
         Execute an agentic run.
@@ -88,6 +91,9 @@ class AgenticAPIClient:
                 Note: Support depends on API version — may return a 400 error on some deployments.
             callback_url: Public endpoint to receive async run results via POST (requires is_async=True).
             callback_token: Bearer token included in the Authorization header of the callback POST.
+            show_payloads: Print request/response JSON directly to stdout, unmasked (bypasses logging).
+            session_id: Raw sessionId from create_session response. When provided, sent as the
+                highest-priority identity type ("sessionId") to retrieve the existing session.
 
         Returns:
             Response dictionary from the API
@@ -119,10 +125,10 @@ class AgenticAPIClient:
         # Build request URL
         url = build_execute_url(self.config.app_id, self.config.env_name)
 
-        # Build sessionIdentity array
-        # If user_reference not provided, use session_identity for both
+        # Build sessionIdentity array using priority-based resolution:
+        # sessionId (highest) > sessionReference > userReference (lowest)
         user_ref = user_reference if user_reference else session_identity
-        session_id_array = build_session_identity(user_ref, session_identity)
+        session_id_array = build_session_identity(user_ref, session_identity, session_id)
 
         # Build input array
         input_array = build_input(query)
@@ -163,6 +169,8 @@ class AgenticAPIClient:
 
         # Make the request
         log_api_request(url, "POST", request_body)
+        if show_payloads:
+            print(f"\n[request] {json.dumps(request_body, indent=2)}")
 
         # Check if streaming is enabled
         # NOTE: "Streaming" provides status updates via SSE, not real-time content streaming
@@ -204,8 +212,11 @@ class AgenticAPIClient:
                 return self._process_streaming_response(response)
 
             # Handle normal JSON response
-            log_api_response(response.status_code, response.json() if response.text else None)
-            return response.json()
+            response_json = response.json() if response.text else None
+            log_api_response(response.status_code, response_json)
+            if show_payloads:
+                print(f"\n[response] {json.dumps(response_json, indent=2)}")
+            return response_json
 
         except Timeout:
             raise AgenticTimeoutError(
@@ -495,6 +506,7 @@ class AgenticAPIClient:
         user_reference: str,
         session_reference: Optional[str] = None,
         source: Optional[str] = None,
+        show_payloads: bool = False,
     ) -> dict[str, Any]:
         """
         Create a new conversation session via the Kore.ai Sessions API.
@@ -542,10 +554,15 @@ class AgenticAPIClient:
             request_body["source"] = source
 
         log_api_request(url, "POST", request_body)
+        if show_payloads:
+            print(f"\n[request] {json.dumps(request_body, indent=2)}")
         try:
             response = self.session.post(url, json=request_body, timeout=self.config.timeout)
 
-            log_api_response(response.status_code, response.json() if response.text else None)
+            response_json = response.json() if response.text else None
+            log_api_response(response.status_code, response_json)
+            if show_payloads:
+                print(f"\n[response] {json.dumps(response_json, indent=2)}")
 
             if response.status_code == 401:
                 raise AuthenticationError(
@@ -562,12 +579,16 @@ class AgenticAPIClient:
                 )
 
             raw = response.json()
-            # Normalize: some environments wrap session data in a "session" key
-            session_data = raw.get("session", raw)
-            # Normalize: fall back to sessionId when sessionReference is null/absent
-            if not session_data.get("sessionReference"):
-                session_data["sessionReference"] = session_data.get("sessionId", "")
-            return session_data
+            # Extract session identifiers from the "session" sub-object if present
+            session_obj = raw.get("session", raw)
+            session_id_val = session_obj.get("sessionId", "")
+            session_ref_val = session_obj.get("sessionReference") or session_id_val
+            # Promote normalized identifiers to the top level so callers have
+            # easy access alongside top-level fields like "output" and "events"
+            result = dict(raw)
+            result["sessionId"] = session_id_val
+            result["sessionReference"] = session_ref_val
+            return result
 
         except (AuthenticationError, APIResponseError):
             raise
