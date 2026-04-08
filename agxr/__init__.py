@@ -5,7 +5,7 @@ A Python CLI tool for interacting with the Kore.ai Agentic App Platform API.
 Supports executing AI agent runs, streaming responses, and managing async operations.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __author__ = "David Gwartney"
 __email__ = "david.gwartney@gmail.com"
 
@@ -34,7 +34,9 @@ from agxr.exceptions import (
     TimeoutError,
     ValidationError,
 )
+from agxr.mcp_server import AgentSession, AgenticMCPServer
 from agxr.profiles import ProfileManager
+from agxr.testing import AgentTestSession
 
 __all__ = [
     "__version__",
@@ -50,6 +52,9 @@ __all__ = [
     "Config",
     "AgenticAPIClient",
     "ProfileManager",
+    "AgentTestSession",
+    "AgentSession",
+    "AgenticMCPServer",
     # Exceptions
     "AgenticAPIError",
     "AuthenticationError",

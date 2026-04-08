@@ -45,24 +45,21 @@ class Config:
         self._base_url = "https://agent-platform.kore.ai/api/v2"
         self._timeout = 30
 
+        # Load from explicit .env file only when --env-file is passed.
+        # Auto-discovery of .env in the current directory is intentionally omitted:
+        # a stray .env from an unrelated project would silently override profile
+        # values, leading to confusing behaviour.
+        if env_file:
+            logger.debug(f"Loading environment from file: {env_file}")
+            load_dotenv(env_file, override=False)
+
         # Load from profile if specified (precedence: 3)
         if profile:
             logger.debug(f"Loading configuration from profile: {profile}")
             self._load_from_profile(profile)
 
-        # Load from .env file if it exists (will be overridden by env vars)
-        if env_file:
-            logger.debug(f"Loading environment from file: {env_file}")
-            load_dotenv(env_file)
-        else:
-            # Try to load from current directory
-            env_path = Path.cwd() / ".env"
-            if env_path.exists():
-                logger.debug(f"Loading environment from: {env_path}")
-                load_dotenv(env_path)
-
-        # Load configuration from environment variables (precedence: 2)
-        # These override profile values
+        # Load configuration from environment variables (precedence: 2).
+        # Only real shell env vars (or those loaded via --env-file above) apply here.
         if os.getenv("KOREAI_API_KEY"):
             self._api_key = os.getenv("KOREAI_API_KEY")
         if os.getenv("KOREAI_APP_ID"):

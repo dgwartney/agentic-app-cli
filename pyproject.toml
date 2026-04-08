@@ -39,6 +39,7 @@ classifiers = [
 dependencies = [
     "requests>=2.31.0",
     "python-dotenv>=1.0.0",
+    "fastmcp>=2.0",
 ]
 
 [project.optional-dependencies]
@@ -62,6 +63,7 @@ Changelog = "https://github.com/dgwartney/agentic-app-cli/releases"
 
 [project.scripts]
 agxr = "agxr.cli:main"
+agxr-mcp = "agxr.mcp_server:main"
 
 [build-system]
 requires = ["hatchling"]

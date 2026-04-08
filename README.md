@@ -6,6 +6,7 @@
 
 - **Interactive Chat Mode**: REPL-style chat interface with session management and special commands
 - **Special Commands**: Runtime control with `#help`, `#new`, `#info`, `#clear`, `#debug`, `#stream` commands
+- **MCP Server**: Expose your agent as MCP tools so Claude Code can interact with it directly
 - **Profile Management**: Store and manage multiple configuration sets for different environments
 - **Execute AI agent runs**: Synchronous or asynchronous execution modes
 - **Real-time streaming**: Stream responses token-by-token, by message, or with custom events
@@ -13,6 +14,7 @@
 - **Enhanced debug modes**: Comprehensive debugging with `all`, `function-call`, and `thoughts` modes
 - **Advanced logging**: Python standard library logging with file output and configurable log levels
 - **File attachments**: Support for attaching files to requests
+- **Server-side session lifecycle**: Full Sessions API integration — create, use, and terminate sessions for proper memory management
 - **Session management**: Maintain conversation continuity across requests
 - **Flexible configuration**: Multiple configuration methods with clear precedence rules
 - **Secure storage**: Profiles stored with proper file permissions (0600/0700)
@@ -460,10 +462,71 @@ execute_url = build_execute_url(app_id="my-app", env_name="production")
 headers = build_headers(api_key="your-api-key")
 ```
 
+## MCP Server
+
+`agxr-mcp` exposes your Kore.ai agent as MCP tools so Claude Code (or any MCP client) can interact with it directly.
+
+### Start the MCP server
+
+```bash
+# Using a named profile
+agxr-mcp --profile my-profile
+
+# Using environment variables (KOREAI_API_KEY, KOREAI_APP_ID, KOREAI_ENV_NAME)
+agxr-mcp
+```
+
+### Add to Claude Code
+
+Register the server using the `claude` CLI (user-level, available in all projects):
+
+```bash
+claude mcp add -s user agxr -- uv run agxr-mcp --profile my-profile
+```
+
+Or for project-level registration, create `.mcp.json` in your project directory:
+
+```json
+{
+  "mcpServers": {
+    "agxr": {
+      "command": "uv",
+      "args": ["run", "agxr-mcp", "--profile", "my-profile"],
+      "cwd": "/path/to/consumer/project"
+    }
+  }
+}
+```
+
+Then open Claude Code from that directory — it will detect `.mcp.json` automatically.
+
+### Available MCP Tools
+
+| Tool | Description |
+|------|-------------|
+| `start_session` | Create a new conversation session; returns `mcp_session_id` |
+| `end_session` | Terminate a session and free server-side memory |
+| `send_message` | Send a message to the agent in an existing session |
+| `get_session_history` | Return the full conversation history for a session |
+| `reset_session` | Clear local conversation history (session stays active) |
+| `execute_query` | One-shot query without creating a persistent session |
+| `check_run_status` | Poll the status of an asynchronous run |
+| `list_profiles` | List available configuration profiles |
+| `get_server_info` | Return app ID, env name, and active session count |
+
+### Typical session flow
+
+```
+start_session → send_message (×N) → end_session
+```
+
+For stateless single-turn interactions, use `execute_query` directly.
+
 ## Documentation
 
 - [API Documentation](https://docs.kore.ai/agentic-platform/)
 - [Type Reference](./agxr/api_reference.py)
+- [Usage Guide](./USAGE.md) — Full CLI and Python API reference
 - [Testing Guide](./TESTING.md) — End-to-end agent testing with `AgentTestSession`
 
 ## Requirements
@@ -487,42 +550,4 @@ For issues and questions:
 
 ## Changelog
 
-### 0.5.0 (Chat Mode & Special Commands)
-
-- **Interactive Chat Mode**: REPL-style chat interface with persistent sessions
-- **Special Commands**: Runtime control commands (`#help`, `#new`, `#info`, `#clear`, `#debug`, `#stream`)
-- **Session Management**: Auto-generated session IDs with ability to start fresh sessions
-- **Toggle Settings**: Change debug and streaming modes without restarting chat
-- **Improved UX**: Case-insensitive commands, helpful error messages, discoverable features
-
-### 0.4.0 (Enhanced Debug & Logging)
-
-- **Debug Modes**: Support for `all`, `function-call`, and `thoughts` debug modes
-- **Advanced Logging**: Python standard library logging with file output
-- **Log Levels**: Configurable log levels (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-- **Secure Logging**: Automatic masking of sensitive data in logs
-- **Verbose Output**: Enhanced verbose mode with detailed debug information
-
-### 0.3.0 (Profile Management)
-
-- **Profile Management**: Add, list, delete, and manage configuration profiles
-- **Default Profiles**: Set a default profile to use automatically
-- **Secure Storage**: Profiles stored in `~/.kore/` with secure permissions (0600)
-- **Configuration Precedence**: Clear precedence rules (CLI args > Env vars > Profiles > Defaults)
-- **Interactive Profile Creation**: Create profiles interactively or via CLI arguments
-- **Profile Display**: List profiles with masked or full API keys
-
-### 0.2.0 (Streaming & Session Support)
-
-- **Real-time Streaming**: Token-by-token, message, and custom event streaming
-- **Session Identity**: Maintain conversation continuity across requests
-- **Async Execution**: Asynchronous run execution with status polling
-- **Enhanced Error Handling**: Better error messages and recovery
-
-### 0.1.0 (Initial Release)
-
-- Initial package structure
-- API type definitions and reference implementation
-- Basic CLI framework
-- Execute and status commands
-- Documentation and examples
+See [CHANGELOG.md](./CHANGELOG.md) for the full version history.

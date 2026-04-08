@@ -220,3 +220,76 @@ class TestConfig:
         repr_str = repr(config)
 
         assert "Not set" in repr_str
+
+
+class TestConfigProfile:
+    """Test Config._load_from_profile() via Config(profile=...) constructor."""
+
+    FULL_PROFILE = {
+        "api_key": "profile-api-key",
+        "app_id": "profile-app-id",
+        "env_name": "staging",
+        "base_url": "https://custom.kore.ai/api/v2",
+        "timeout": 60,
+    }
+
+    def _make_config_with_profile(self, profile_dict, monkeypatch):
+        """Helper: create Config(profile='test') with a mocked ProfileManager."""
+        with patch("agxr.profiles.ProfileManager") as MockPM:
+            mock_manager = MockPM.return_value
+            mock_manager.get_profile.return_value = profile_dict
+            config = Config(profile="test")
+        return config
+
+    def test_profile_loads_all_fields(self, monkeypatch):
+        """All profile fields are applied to the Config instance."""
+        config = self._make_config_with_profile(self.FULL_PROFILE, monkeypatch)
+
+        assert config._api_key == "profile-api-key"
+        assert config._app_id == "profile-app-id"
+        assert config._env_name == "staging"
+        assert config._base_url == "https://custom.kore.ai/api/v2"
+        assert config._timeout == 60
+
+    def test_profile_env_name_defaults_to_production(self, monkeypatch):
+        """env_name defaults to 'production' when absent from profile."""
+        profile = {k: v for k, v in self.FULL_PROFILE.items() if k != "env_name"}
+        config = self._make_config_with_profile(profile, monkeypatch)
+
+        assert config._env_name == "production"
+
+    def test_profile_base_url_defaults(self, monkeypatch):
+        """base_url defaults to the Kore.ai URL when absent from profile."""
+        profile = {k: v for k, v in self.FULL_PROFILE.items() if k != "base_url"}
+        config = self._make_config_with_profile(profile, monkeypatch)
+
+        assert config._base_url == "https://agent-platform.kore.ai/api/v2"
+
+    def test_profile_timeout_defaults_to_30(self, monkeypatch):
+        """timeout defaults to 30 when absent from profile."""
+        profile = {k: v for k, v in self.FULL_PROFILE.items() if k != "timeout"}
+        config = self._make_config_with_profile(profile, monkeypatch)
+
+        assert config._timeout == 30
+
+    def test_profile_exception_propagates(self, monkeypatch):
+        """Exception from ProfileManager.get_profile is re-raised from Config.__init__."""
+        with patch("agxr.profiles.ProfileManager") as MockPM:
+            mock_manager = MockPM.return_value
+            mock_manager.get_profile.side_effect = KeyError("unknown-profile")
+
+            with pytest.raises(KeyError):
+                Config(profile="unknown-profile")
+
+    def test_env_vars_override_profile_values(self, monkeypatch):
+        """Env vars take precedence over profile values (env var wins)."""
+        monkeypatch.setenv("KOREAI_API_KEY", "env-api-key")
+        monkeypatch.setenv("KOREAI_APP_ID", "env-app-id")
+
+        with patch("agxr.profiles.ProfileManager") as MockPM:
+            mock_manager = MockPM.return_value
+            mock_manager.get_profile.return_value = self.FULL_PROFILE
+            config = Config(profile="test")
+
+        assert config._api_key == "env-api-key"
+        assert config._app_id == "env-app-id"

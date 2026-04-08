@@ -20,7 +20,9 @@ from agxr.api_reference import (
     build_headers,
     build_input,
     build_session_identity,
+    build_sessions_url,
     build_status_url,
+    build_terminate_session_url,
 )
 from agxr.config import Config
 from agxr.exceptions import (
@@ -66,12 +68,12 @@ class AgenticAPIClient:
         debug_enabled: bool = False,
         debug_mode: Optional[str] = None,
         metadata: Optional[dict[str, Any]] = None,
+        is_async: bool = False,
+        callback_url: Optional[str] = None,
+        callback_token: Optional[str] = None,
     ) -> dict[str, Any]:
         """
         Execute an agentic run.
-
-        NOTE: The execute endpoint does NOT support async execution.
-        The "async" parameter is rejected by the API with a 400 error.
 
         Args:
             query: User query/input text
@@ -82,6 +84,10 @@ class AgenticAPIClient:
             debug_enabled: Enable debug mode
             debug_mode: Debug mode level ('all', 'function-call', or 'thoughts')
             metadata: Custom metadata dictionary
+            is_async: Enable asynchronous execution; returns a runId for status polling.
+                Note: Support depends on API version — may return a 400 error on some deployments.
+            callback_url: Public endpoint to receive async run results via POST (requires is_async=True).
+            callback_token: Bearer token included in the Authorization header of the callback POST.
 
         Returns:
             Response dictionary from the API
@@ -146,6 +152,14 @@ class AgenticAPIClient:
         # Add metadata if provided
         if metadata:
             request_body["metaData"] = metadata
+
+        # Add async execution options if requested
+        if is_async:
+            request_body["isAsync"] = True
+        if callback_url:
+            request_body["callbackUrl"] = callback_url
+        if callback_token:
+            request_body["callbackToken"] = callback_token
 
         # Make the request
         log_api_request(url, "POST", request_body)
@@ -475,6 +489,173 @@ class AgenticAPIClient:
         raise AgenticTimeoutError(
             f"Run did not complete after {max_attempts * interval} seconds"
         )
+
+    def create_session(
+        self,
+        user_reference: str,
+        session_reference: Optional[str] = None,
+        source: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """
+        Create a new conversation session via the Kore.ai Sessions API.
+
+        Calls POST /apps/{app_id}/environments/{env_name}/sessions. The returned
+        sessionReference should be used as the session_identity in subsequent
+        execute_run() calls to maintain conversation continuity.
+
+        Args:
+            user_reference: Stable user identifier (e.g. "user-abc123"). Must not be empty.
+            session_reference: Optional explicit session reference. If omitted, the API
+                generates and returns one in the response.
+            source: Optional origin system identifier for analytics (e.g. "AP", "AIS-AA").
+                Defaults to "AP" on the server side when not provided.
+
+        Returns:
+            Session metadata dict containing:
+                - sessionReference: Use this in subsequent execute_run() calls
+                - sessionId: Kore.ai internal session identifier
+                - userReference: Echoed user reference
+                - userId: Kore.ai internal user identifier
+                - status: Session status (idle, busy, error)
+                - allowedMimeTypes: List of permitted file MIME types
+                - fileUploadConfig: File upload rules for this session
+
+        Raises:
+            ValidationError: If user_reference is empty.
+            AuthenticationError: If the API key is invalid (401).
+            APIResponseError: If the API returns an error status.
+            APIRequestError: If the HTTP request fails (network error).
+            AgenticTimeoutError: If the request times out.
+        """
+        if not user_reference or not user_reference.strip():
+            raise ValidationError("user_reference cannot be empty")
+
+        url = build_sessions_url(self.config.app_id, self.config.env_name)
+
+        # Build sessionIdentity array
+        session_id_array = build_session_identity(user_reference, session_reference)
+
+        request_body: dict[str, Any] = {
+            "sessionIdentity": session_id_array,
+        }
+        if source:
+            request_body["source"] = source
+
+        log_api_request(url, "POST", request_body)
+        try:
+            response = self.session.post(url, json=request_body, timeout=self.config.timeout)
+
+            log_api_response(response.status_code, response.json() if response.text else None)
+
+            if response.status_code == 401:
+                raise AuthenticationError(
+                    "Authentication failed. Check your API key.", status_code=401
+                )
+            elif response.status_code >= 400:
+                error_data = response.json() if response.text else {}
+                error_message = error_data.get("error", {}).get(
+                    "message", response.text or "Unknown error"
+                )
+                raise APIResponseError(
+                    f"Session creation failed: {error_message}",
+                    status_code=response.status_code,
+                )
+
+            raw = response.json()
+            # Normalize: some environments wrap session data in a "session" key
+            session_data = raw.get("session", raw)
+            # Normalize: fall back to sessionId when sessionReference is null/absent
+            if not session_data.get("sessionReference"):
+                session_data["sessionReference"] = session_data.get("sessionId", "")
+            return session_data
+
+        except (AuthenticationError, APIResponseError):
+            raise
+        except Timeout:
+            raise AgenticTimeoutError(
+                f"Request timed out after {self.config.timeout} seconds"
+            )
+        except RequestException as e:
+            raise APIRequestError(f"Request failed: {str(e)}")
+
+    def terminate_session(
+        self,
+        session_reference: str,
+    ) -> dict[str, Any]:
+        """
+        Terminate a session and delete server-side session memory.
+
+        Calls POST /apps/{app_id}/environments/{env_name}/sessions/terminate.
+        Terminating a session deletes all server-side memory associated with it.
+        Use this when a conversation is complete to free resources.
+
+        Args:
+            session_reference: The sessionReference value returned from create_session().
+                Must not be empty.
+
+        Returns:
+            Terminated session metadata dict containing:
+                - status: Final session status
+                - sessionReference: Echoed session reference
+                - userReference: Echoed user reference
+                - attachments: List of files that were attached to the session
+
+        Raises:
+            ValidationError: If session_reference is empty.
+            AuthenticationError: If the API key is invalid (401).
+            RunNotFoundError: If the session is not found (404).
+            APIResponseError: If the API returns an error status.
+            APIRequestError: If the HTTP request fails (network error).
+            AgenticTimeoutError: If the request times out.
+        """
+        if not session_reference or not session_reference.strip():
+            raise ValidationError("session_reference cannot be empty")
+
+        url = build_terminate_session_url(self.config.app_id, self.config.env_name)
+
+        request_body: dict[str, Any] = {
+            "sessionIdentity": [
+                {
+                    "type": "sessionReference",
+                    "value": session_reference,
+                }
+            ]
+        }
+
+        log_api_request(url, "POST", request_body)
+        try:
+            response = self.session.post(url, json=request_body, timeout=self.config.timeout)
+
+            log_api_response(response.status_code, response.json() if response.text else None)
+
+            if response.status_code == 401:
+                raise AuthenticationError(
+                    "Authentication failed. Check your API key.", status_code=401
+                )
+            elif response.status_code == 404:
+                raise RunNotFoundError(
+                    f"Session '{session_reference}' not found.", status_code=404
+                )
+            elif response.status_code >= 400:
+                error_data = response.json() if response.text else {}
+                error_message = error_data.get("error", {}).get(
+                    "message", response.text or "Unknown error"
+                )
+                raise APIResponseError(
+                    f"Session termination failed: {error_message}",
+                    status_code=response.status_code,
+                )
+
+            return response.json()
+
+        except (AuthenticationError, RunNotFoundError, APIResponseError):
+            raise
+        except Timeout:
+            raise AgenticTimeoutError(
+                f"Request timed out after {self.config.timeout} seconds"
+            )
+        except RequestException as e:
+            raise APIRequestError(f"Request failed: {str(e)}")
 
     def close(self) -> None:
         """Close the session and clean up resources."""
