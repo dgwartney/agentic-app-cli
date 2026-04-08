@@ -320,6 +320,78 @@ class TestGetRunStatus:
             client.get_run_status("run-123")
         assert "not found" in str(exc_info.value)
 
+    @patch("requests.Session.post")
+    def test_get_run_status_401_raises_auth_error(self, mock_post, client):
+        """401 response raises AuthenticationError."""
+        mock_response = Mock()
+        mock_response.status_code = 401
+        mock_response.text = "Unauthorized"
+        mock_post.return_value = mock_response
+
+        with pytest.raises(AuthenticationError) as exc_info:
+            client.get_run_status("run-123")
+        assert "Authentication failed" in str(exc_info.value)
+
+    @patch("requests.Session.post")
+    def test_get_run_status_500_raises_api_error(self, mock_post, client):
+        """500 response raises APIResponseError."""
+        mock_response = Mock()
+        mock_response.status_code = 500
+        mock_response.json.return_value = {"error": {"message": "Server error"}}
+        mock_response.text = '{"error": {"message": "Server error"}}'
+        mock_post.return_value = mock_response
+
+        with pytest.raises(APIResponseError):
+            client.get_run_status("run-123")
+
+    @patch("requests.Session.post")
+    def test_get_run_status_with_session_identity_in_body(self, mock_post, client):
+        """session_identity is included in the POST body when provided."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"status": "success"}
+        mock_response.text = "success"
+        mock_post.return_value = mock_response
+
+        identity = [{"type": "sessionReference", "value": "sr-abc"}]
+        client.get_run_status("run-123", session_identity=identity)
+
+        body = mock_post.call_args[1]["json"]
+        assert "sessionIdentity" in body
+        assert body["sessionIdentity"] == identity
+
+    @patch("requests.Session.post")
+    def test_get_run_status_without_session_identity_omits_key(self, mock_post, client):
+        """sessionIdentity is absent from body when session_identity not provided."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"status": "success"}
+        mock_response.text = "success"
+        mock_post.return_value = mock_response
+
+        client.get_run_status("run-123")
+
+        body = mock_post.call_args[1]["json"]
+        assert "sessionIdentity" not in body
+
+    @patch("requests.Session.post")
+    def test_get_run_status_timeout(self, mock_post, client):
+        """requests.Timeout raises AgenticTimeoutError."""
+        from agxr.exceptions import TimeoutError as AgenticTimeoutError
+
+        mock_post.side_effect = requests.Timeout()
+
+        with pytest.raises(AgenticTimeoutError):
+            client.get_run_status("run-123")
+
+    @patch("requests.Session.post")
+    def test_get_run_status_request_exception(self, mock_post, client):
+        """requests.RequestException raises APIRequestError."""
+        mock_post.side_effect = requests.RequestException("Network failure")
+
+        with pytest.raises(APIRequestError):
+            client.get_run_status("run-123")
+
 
 class TestPollRunStatus:
     """Test poll_run_status method."""
@@ -385,6 +457,19 @@ class TestPollRunStatus:
         with pytest.raises(TimeoutError) as exc_info:
             client.poll_run_status("run-123", max_attempts=3, interval=1)
         assert "did not complete" in str(exc_info.value)
+
+    @patch("requests.Session.post")
+    def test_poll_run_status_unknown_status_raises_error(self, mock_post, client):
+        """Unexpected status value raises APIResponseError."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"status": "weird_unexpected"}
+        mock_response.text = "success"
+        mock_post.return_value = mock_response
+
+        with pytest.raises(APIResponseError) as exc_info:
+            client.poll_run_status("run-123", max_attempts=1, interval=1)
+        assert "Unknown run status" in str(exc_info.value)
 
 
 class TestClientContextManager:
@@ -536,6 +621,39 @@ class TestCreateSession:
         body = call_kwargs[1]["json"]
         assert "source" not in body
 
+    @patch("requests.Session.post")
+    def test_null_session_reference_falls_back_to_session_id(self, mock_post, client):
+        """sessionReference=null in response is replaced by sessionId value."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "sessionReference": None,
+            "sessionId": "si-fallback-123",
+            "status": "idle",
+        }
+        mock_response.text = "success"
+        mock_post.return_value = mock_response
+
+        result = client.create_session("user-001")
+
+        assert result["sessionReference"] == "si-fallback-123"
+
+    @patch("requests.Session.post")
+    def test_absent_session_reference_falls_back_to_session_id(self, mock_post, client):
+        """Missing sessionReference key in response is filled by sessionId value."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "sessionId": "si-fallback-456",
+            "status": "idle",
+        }
+        mock_response.text = "success"
+        mock_post.return_value = mock_response
+
+        result = client.create_session("user-001")
+
+        assert result["sessionReference"] == "si-fallback-456"
+
 
 class TestTerminateSession:
     """Test terminate_session method."""
@@ -641,6 +759,180 @@ class TestTerminateSession:
         body = call_kwargs[1]["json"]
         assert body["sessionIdentity"][0]["type"] == "sessionReference"
         assert body["sessionIdentity"][0]["value"] == "sr-abc123"
+
+
+class TestExecuteRunGenericErrors:
+    """Test generic >=400 error handling in execute_run (lines 192-200)."""
+
+    @patch("requests.Session.post")
+    def test_execute_run_500_error_with_json_body(self, mock_post, client):
+        """500 error with JSON body extracts error.message into APIResponseError."""
+        mock_response = Mock()
+        mock_response.status_code = 500
+        mock_response.json.return_value = {"error": {"message": "Internal server error"}}
+        mock_response.text = '{"error": {"message": "Internal server error"}}'
+        mock_post.return_value = mock_response
+
+        with pytest.raises(APIResponseError) as exc_info:
+            client.execute_run(query="Hello", session_identity="session-123")
+        assert "Internal server error" in str(exc_info.value)
+
+    @patch("requests.Session.post")
+    def test_execute_run_500_error_with_empty_body(self, mock_post, client):
+        """500 error with empty body uses 'Unknown error' fallback."""
+        mock_response = Mock()
+        mock_response.status_code = 500
+        mock_response.text = ""
+        mock_post.return_value = mock_response
+
+        with pytest.raises(APIResponseError):
+            client.execute_run(query="Hello", session_identity="session-123")
+
+
+class TestStreamingResponseProcessing:
+    """Test _process_streaming_response via execute_run with stream_enabled=True."""
+
+    def _make_stream_response(self, sse_lines):
+        """Build a mock 201 response whose iter_lines yields the given lines."""
+        mock_response = Mock()
+        mock_response.status_code = 201
+        mock_response.iter_lines.return_value = iter(sse_lines)
+        return mock_response
+
+    @patch("requests.Session.post")
+    def test_sse_content_in_events_returned(self, mock_post, client):
+        """Output text inside SSE events is collected and returned."""
+        sse_lines = [
+            'data: {"sessionInfo": {"runId": "r-1"}, '
+            '"output": [{"type": "text", "content": "Hello there"}], "isLastEvent": true}',
+        ]
+        mock_post.return_value = self._make_stream_response(sse_lines)
+
+        result = client.execute_run(
+            query="Hi", session_identity="s-1", stream_enabled=True
+        )
+
+        assert result["streaming"] is True
+        assert any("Hello there" in o.get("content", "") for o in result["output"])
+
+    @patch("requests.Session.post")
+    def test_sse_done_marker_stops_processing(self, mock_post, client):
+        """[DONE] marker stops SSE processing; subsequent lines are ignored."""
+        sse_lines = [
+            'data: {"sessionInfo": {"runId": "r-1"}, '
+            '"output": [{"type": "text", "content": "Keep this"}]}',
+            "data: [DONE]",
+            'data: {"output": [{"type": "text", "content": "Drop this"}]}',
+        ]
+        mock_post.return_value = self._make_stream_response(sse_lines)
+
+        result = client.execute_run(
+            query="Hi", session_identity="s-1", stream_enabled=True
+        )
+
+        full_content = "".join(
+            o.get("content", "") for o in result.get("output", [])
+        )
+        assert "Keep this" in full_content
+        assert "Drop this" not in full_content
+
+    @patch("requests.Session.post")
+    def test_sse_fallback_to_status_endpoint_when_no_stream_content(
+        self, mock_post, client
+    ):
+        """When stream has no output, content is fetched from the status endpoint."""
+        stream_response = Mock()
+        stream_response.status_code = 201
+        stream_response.iter_lines.return_value = iter([
+            'data: {"sessionInfo": {"runId": "r-99", "sessionReference": "sr-ref"}, '
+            '"isLastEvent": true}',
+        ])
+
+        status_response = Mock()
+        status_response.status_code = 200
+        status_response.json.return_value = {
+            "run": {
+                "status": "success",
+                "kwargs": {
+                    "output": [{"type": "text", "content": "Status endpoint content"}]
+                },
+            }
+        }
+        status_response.text = "success"
+
+        mock_post.side_effect = [stream_response, status_response]
+
+        result = client.execute_run(
+            query="Hi", session_identity="s-1", stream_enabled=True
+        )
+
+        assert result["streaming"] is True
+        assert result["output"][0]["content"] == "Status endpoint content"
+
+    @patch("requests.Session.post")
+    def test_sse_empty_lines_skipped(self, mock_post, client):
+        """Empty lines in the SSE stream are silently skipped."""
+        sse_lines = [
+            "",
+            'data: {"sessionInfo": {"runId": "r-1"}, '
+            '"output": [{"type": "text", "content": "Hi"}], "isLastEvent": true}',
+            "",
+        ]
+        mock_post.return_value = self._make_stream_response(sse_lines)
+
+        result = client.execute_run(
+            query="Hi", session_identity="s-1", stream_enabled=True
+        )
+
+        assert result["streaming"] is True
+
+    @patch("requests.Session.post")
+    def test_sse_invalid_json_skipped_processing_continues(self, mock_post, client):
+        """Malformed JSON in a data line is skipped; subsequent valid events processed."""
+        sse_lines = [
+            "data: {invalid json!!!}",
+            'data: {"sessionInfo": {"runId": "r-1"}, '
+            '"output": [{"type": "text", "content": "Valid"}], "isLastEvent": true}',
+        ]
+        mock_post.return_value = self._make_stream_response(sse_lines)
+
+        result = client.execute_run(
+            query="Hi", session_identity="s-1", stream_enabled=True
+        )
+
+        assert result["streaming"] is True
+        assert any("Valid" in o.get("content", "") for o in result["output"])
+
+    @patch("requests.Session.post")
+    def test_sse_event_type_lines_skipped(self, mock_post, client):
+        """Lines starting with 'event: ' are handled without error."""
+        sse_lines = [
+            "event: message",
+            'data: {"sessionInfo": {"runId": "r-1"}, '
+            '"output": [{"type": "text", "content": "OK"}], "isLastEvent": true}',
+        ]
+        mock_post.return_value = self._make_stream_response(sse_lines)
+
+        result = client.execute_run(
+            query="Hi", session_identity="s-1", stream_enabled=True
+        )
+
+        assert result["streaming"] is True
+
+    @patch("requests.Session.post")
+    def test_sse_no_content_no_run_id_returns_empty_output(self, mock_post, client):
+        """Stream with no output content and no runId returns empty output list."""
+        sse_lines = [
+            'data: {"isLastEvent": true}',
+        ]
+        mock_post.return_value = self._make_stream_response(sse_lines)
+
+        result = client.execute_run(
+            query="Hi", session_identity="s-1", stream_enabled=True
+        )
+
+        assert result["streaming"] is True
+        assert result["output"] == []
 
 
 class TestExecuteRunExtensions:

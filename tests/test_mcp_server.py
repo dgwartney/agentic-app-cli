@@ -646,3 +646,80 @@ class TestErrorResponse:
     def test_error_message_included(self):
         result = AgenticMCPServer._error_response(AuthenticationError("bad key"))
         assert "bad key" in result["error"]
+
+
+# ---------------------------------------------------------------------------
+# Tests: AgenticMCPServer.run()
+# ---------------------------------------------------------------------------
+
+class TestMCPServerRun:
+    """Test the run() method delegates to the underlying FastMCP instance."""
+
+    def test_run_delegates_to_mcp_run(self, server):
+        """run() should call self.mcp.run with the given transport."""
+        server.mcp.run = Mock()
+        server.run(transport="stdio")
+        server.mcp.run.assert_called_once_with(transport="stdio")
+
+    def test_run_default_transport_is_stdio(self, server):
+        """run() default transport is 'stdio'."""
+        server.mcp.run = Mock()
+        server.run()
+        server.mcp.run.assert_called_once_with(transport="stdio")
+
+
+# ---------------------------------------------------------------------------
+# Tests: main() entry point
+# ---------------------------------------------------------------------------
+
+class TestMainEntryPoint:
+    """Test the main() CLI entry point argument parsing and server startup."""
+
+    def test_main_no_args_uses_defaults(self, monkeypatch):
+        """No CLI args → profile=None, transport='stdio'."""
+        monkeypatch.setenv("KOREAI_API_KEY", "test-key")
+        monkeypatch.setenv("KOREAI_APP_ID", "test-app")
+        monkeypatch.setenv("KOREAI_ENV_NAME", "test-env")
+
+        from agxr.mcp_server import main
+
+        with patch("agxr.mcp_server.AgenticMCPServer") as MockServer, \
+             patch("sys.argv", ["agxr-mcp"]):
+            mock_instance = Mock()
+            MockServer.return_value = mock_instance
+            main()
+
+        MockServer.assert_called_once_with(profile=None)
+        mock_instance.run.assert_called_once_with(transport="stdio")
+
+    def test_main_profile_arg_passed_through(self, monkeypatch):
+        """--profile NAME passes profile to AgenticMCPServer constructor."""
+        monkeypatch.setenv("KOREAI_API_KEY", "test-key")
+        monkeypatch.setenv("KOREAI_APP_ID", "test-app")
+        monkeypatch.setenv("KOREAI_ENV_NAME", "test-env")
+
+        from agxr.mcp_server import main
+
+        with patch("agxr.mcp_server.AgenticMCPServer") as MockServer, \
+             patch("sys.argv", ["agxr-mcp", "--profile", "prod"]):
+            mock_instance = Mock()
+            MockServer.return_value = mock_instance
+            main()
+
+        MockServer.assert_called_once_with(profile="prod")
+
+    def test_main_transport_arg_passed_to_run(self, monkeypatch):
+        """--transport stdio passes transport to server.run()."""
+        monkeypatch.setenv("KOREAI_API_KEY", "test-key")
+        monkeypatch.setenv("KOREAI_APP_ID", "test-app")
+        monkeypatch.setenv("KOREAI_ENV_NAME", "test-env")
+
+        from agxr.mcp_server import main
+
+        with patch("agxr.mcp_server.AgenticMCPServer") as MockServer, \
+             patch("sys.argv", ["agxr-mcp", "--transport", "stdio"]):
+            mock_instance = Mock()
+            MockServer.return_value = mock_instance
+            main()
+
+        mock_instance.run.assert_called_once_with(transport="stdio")
