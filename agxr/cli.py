@@ -8,6 +8,7 @@ import argparse
 import getpass
 import json
 import sys
+import time
 from typing import NoReturn, Optional
 
 from agxr import __version__
@@ -726,6 +727,7 @@ Environment Variables:
             '#debug': self._chat_cmd_debug,
             '#stream': self._chat_cmd_stream,
             '#history': self._chat_cmd_history,
+            '#timing': self._chat_cmd_timing,
         }
 
         if command in command_handlers:
@@ -748,6 +750,7 @@ Environment Variables:
         print("  #clear             - Clear the terminal screen")
         print("  #debug on|off      - Toggle debug mode")
         print("  #stream on|off|tokens|messages|custom - Toggle streaming")
+        print("  #timing on|off     - Toggle request/response timing display")
         print("\nTo exit chat, type: exit, quit, or q")
         print()
         return (True, None)
@@ -906,6 +909,31 @@ Environment Variables:
         print("Future: This will show your conversation history.")
         return (True, None)
 
+    def _chat_cmd_timing(
+        self, command_args: str, args: argparse.Namespace, session_id: str
+    ) -> tuple[bool, str | None]:
+        """Handle #timing on|off command."""
+        logger = get_logger()
+
+        if not command_args:
+            state = "enabled" if getattr(args, 'timing', False) else "disabled"
+            print(f"Timing is currently {state}")
+            return (True, None)
+
+        arg = command_args.lower()
+        if arg == "on":
+            args.timing = True
+            print("Timing enabled")
+            logger.info("Request timing enabled via chat command")
+        elif arg == "off":
+            args.timing = False
+            print("Timing disabled")
+            logger.info("Request timing disabled via chat command")
+        else:
+            print(f"Invalid argument: '{command_args}'. Use '#timing on' or '#timing off'")
+
+        return (True, None)
+
     def _handle_execute(self, args: argparse.Namespace) -> int:
         """
         Handle the execute command.
@@ -1050,6 +1078,10 @@ Environment Variables:
                 return 1
             debug_mode = args.debug_mode
 
+        # Initialize timing state (off by default)
+        if not hasattr(args, 'timing'):
+            args.timing = False
+
         # Display welcome banner
         self._print_chat_banner(session_id, self.config.env_name)
 
@@ -1087,6 +1119,7 @@ Environment Variables:
 
                 # Execute the query
                 logger.debug(f"Sending query: {user_input}")
+                _t0 = time.perf_counter()
                 response = self.client.execute_run(
                     query=user_input,
                     session_identity=session_id,
@@ -1097,12 +1130,17 @@ Environment Variables:
                     debug_mode=debug_mode,
                     metadata=metadata,
                 )
+                _elapsed = time.perf_counter() - _t0
 
                 # Display response
                 self._print_chat_response(
                     response,
                     verbose=args.verbose if hasattr(args, 'verbose') else False
                 )
+
+                # Display timing if enabled
+                if getattr(args, 'timing', False):
+                    print(f"\n{self.INFO_LABEL_COLOR}[timing]{self.CHAT_RESET_COLOR} {_elapsed:.3f}s")
 
             except EOFError:
                 # Ctrl+D pressed

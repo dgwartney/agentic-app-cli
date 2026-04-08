@@ -890,6 +890,7 @@ class TestChatSpecialCommands:
         assert "Available Commands:" in output
         assert "#help" in output
         assert "#debug" in output
+        assert "#timing" in output
         # Should NOT call execute_run for special commands
         mock_client.execute_run.assert_not_called()
 
@@ -1120,3 +1121,102 @@ class TestChatSpecialCommands:
         assert exit_code == 0
         output = fake_out.getvalue()
         assert "History feature not yet implemented" in output
+
+    @patch("agxr.cli.AgenticAPIClient")
+    @patch("builtins.input")
+    def test_timing_toggle_on(self, mock_input, mock_client_class, cli, mock_env):
+        """Test #timing on enables timing display."""
+        mock_input.side_effect = ["#timing on", "exit"]
+
+        mock_client = Mock()
+        mock_client_class.return_value = mock_client
+
+        with patch("sys.stdout", new=StringIO()) as fake_out:
+            exit_code = cli.run(["chat"])
+
+        assert exit_code == 0
+        assert "Timing enabled" in fake_out.getvalue()
+
+    @patch("agxr.cli.AgenticAPIClient")
+    @patch("builtins.input")
+    def test_timing_toggle_off(self, mock_input, mock_client_class, cli, mock_env):
+        """Test #timing off disables timing display."""
+        mock_input.side_effect = ["#timing off", "exit"]
+
+        mock_client = Mock()
+        mock_client_class.return_value = mock_client
+
+        with patch("sys.stdout", new=StringIO()) as fake_out:
+            exit_code = cli.run(["chat"])
+
+        assert exit_code == 0
+        assert "Timing disabled" in fake_out.getvalue()
+
+    @patch("agxr.cli.AgenticAPIClient")
+    @patch("builtins.input")
+    def test_timing_show_state(self, mock_input, mock_client_class, cli, mock_env):
+        """Test #timing without args shows current state."""
+        mock_input.side_effect = ["#timing", "exit"]
+
+        mock_client = Mock()
+        mock_client_class.return_value = mock_client
+
+        with patch("sys.stdout", new=StringIO()) as fake_out:
+            exit_code = cli.run(["chat"])
+
+        assert exit_code == 0
+        assert "Timing is currently disabled" in fake_out.getvalue()
+
+    @patch("agxr.cli.AgenticAPIClient")
+    @patch("builtins.input")
+    def test_timing_invalid_arg(self, mock_input, mock_client_class, cli, mock_env):
+        """Test #timing with invalid argument shows error."""
+        mock_input.side_effect = ["#timing maybe", "exit"]
+
+        mock_client = Mock()
+        mock_client_class.return_value = mock_client
+
+        with patch("sys.stdout", new=StringIO()) as fake_out:
+            exit_code = cli.run(["chat"])
+
+        assert exit_code == 0
+        assert "Invalid argument" in fake_out.getvalue()
+
+    @patch("agxr.cli.AgenticAPIClient")
+    @patch("builtins.input")
+    def test_timing_output_after_response(self, mock_input, mock_client_class, cli, mock_env):
+        """Test that timing is displayed after response when enabled."""
+        mock_input.side_effect = ["#timing on", "hello", "exit"]
+
+        mock_client = Mock()
+        mock_client.execute_run.return_value = {
+            "output": [{"type": "text", "content": "Hi there"}],
+            "sessionInfo": {},
+        }
+        mock_client_class.return_value = mock_client
+
+        with patch("sys.stdout", new=StringIO()) as fake_out:
+            exit_code = cli.run(["chat"])
+
+        assert exit_code == 0
+        output = fake_out.getvalue()
+        assert "[timing]" in output
+
+    @patch("agxr.cli.AgenticAPIClient")
+    @patch("builtins.input")
+    def test_timing_not_shown_when_disabled(self, mock_input, mock_client_class, cli, mock_env):
+        """Test that timing is not displayed when disabled (default)."""
+        mock_input.side_effect = ["hello", "exit"]
+
+        mock_client = Mock()
+        mock_client.execute_run.return_value = {
+            "output": [{"type": "text", "content": "Hi there"}],
+            "sessionInfo": {},
+        }
+        mock_client_class.return_value = mock_client
+
+        with patch("sys.stdout", new=StringIO()) as fake_out:
+            exit_code = cli.run(["chat"])
+
+        assert exit_code == 0
+        assert "[timing]" not in fake_out.getvalue()
