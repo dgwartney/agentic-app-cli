@@ -76,8 +76,11 @@ This CLI tool integrates with the Kore.ai Agentic App Platform API to execute an
 ### API Endpoints
 
 1. **Create Session**: `POST /apps/<AppID>/environments/<EnvName>/sessions`
-   - Creates a server-side session; returns `sessionReference`, `sessionId`, `status`
-   - `sessionReference` is the key identifier used in all subsequent execute calls
+   - Creates a server-side session; returns top-level `sessionId`, `sessionReference`, `output`, `events`
+   - Response may wrap session fields under a `"session"` key — client normalizes both forms
+   - `sessionReference` may be `null`; client falls back to `sessionId` in that case
+   - `output` array may contain an agent welcome message to display immediately
+   - Use `sessionId` (not `sessionReference`) as the primary session identifier in execute calls
 
 2. **Terminate Session**: `POST /apps/<AppID>/environments/<EnvName>/sessions/terminate`
    - Terminates a session and clears all server-side agent memory
@@ -90,6 +93,18 @@ This CLI tool integrates with the Kore.ai Agentic App Platform API to execute an
 4. **Find Run Status**: `POST /apps/<AppID>/environments/<EnvName>/runs/<runId>/status`
    - Check status of asynchronous runs
    - Returns pending/running/success/failed status
+
+### Session Identity Priority
+
+Per Kore.ai docs (`https://docs.kore.ai/agent-platform/apis#session-resolution-process`), the server resolves session identity in this priority order:
+
+| Type | Priority | Behavior |
+|---|---|---|
+| `sessionId` | Highest | Retrieves existing session only; cannot create new ones |
+| `sessionReference` | Medium | Finds or creates a session |
+| `userReference` | Lowest | Always creates a new session |
+
+**Implementation**: `build_session_identity()` in `api_reference.py` sends `sessionId` type when available (from `create_session` response), falling back to `sessionReference`, with `userReference` always included for ownership validation. The chat loop stores `sessionId` in `args._chat_session_id` and passes it to every `execute_run` call.
 
 ### Configuration Requirements
 
@@ -254,3 +269,22 @@ The following features are planned for future implementation:
 - New `AgentSession` class for MCP-level session state
 - New `agxr-mcp` CLI entry point
 - 298 tests passing; `mcp_server.py` at 95%, `testing.py` at 100%, `api_reference.py` at 100%
+
+### ✅ Task 9: Payload display (`--show-payloads` / `#payload`)
+- Added `--show-payloads` flag to `execute` and `chat` commands
+- Added `#payload on|off` chat meta command (mirrors `#timing` pattern)
+- Prints `[request]` and `[response]` JSON blocks directly to stdout — bypasses `SensitiveDataFilter`, nothing masked
+- Covers both `execute_run()` and `create_session()` calls (including agent welcome message payload)
+- `show_payloads` param added to `client.execute_run()` and `client.create_session()`
+- Chat loop stores toggle state in `args.show_payloads`; initialized to `False` by default
+- 348 tests passing
+
+### ✅ Task 10: Session identity priority + welcome message fix
+- Fixed `create_session()` return value: now returns full raw response with `sessionId` and `sessionReference` promoted to top level, preserving `output` and `events` fields
+- **Bug fix**: welcome message (`output` array) from `create_session` was previously dropped because only the `session` sub-object was returned; now correctly displayed on chat start and `#new`
+- Added `SESSION_ID = "sessionId"` to `SessionIdentityType` enum (`api_reference.py`)
+- Updated `build_session_identity()` to accept `session_id` param and send it as highest-priority type
+- Added `session_id` param to `execute_run()` — when provided, sends `{"type": "sessionId", "value": "..."}` instead of `sessionReference`
+- Chat loop stores `sessionId` in `args._chat_session_id` and passes it to every `execute_run` call
+- `_chat_cmd_new` updates `args._chat_session_id` on session reset
+- 348 tests passing

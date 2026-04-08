@@ -1026,3 +1026,48 @@ class TestExecuteRunExtensions:
         body = call_kwargs[1]["json"]
         assert "callbackUrl" not in body
         assert "callbackToken" not in body
+
+    @patch("requests.Session.post")
+    def test_show_payloads_prints_request(self, mock_post, client, capsys):
+        """Test that show_payloads=True prints [request] block to stdout."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = self.MOCK_EXECUTE_RESPONSE
+        mock_response.text = "success"
+        mock_post.return_value = mock_response
+
+        client.execute_run("Hello", "session-1", show_payloads=True)
+
+        captured = capsys.readouterr()
+        assert "[request]" in captured.out
+        assert "sessionIdentity" in captured.out
+
+    @patch("requests.Session.post")
+    def test_show_payloads_prints_response(self, mock_post, client, capsys):
+        """Test that show_payloads=True prints [response] block to stdout."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = self.MOCK_EXECUTE_RESPONSE
+        mock_response.text = "success"
+        mock_post.return_value = mock_response
+
+        client.execute_run("Hello", "session-1", show_payloads=True)
+
+        captured = capsys.readouterr()
+        assert "[response]" in captured.out
+        assert "output" in captured.out
+
+    @patch("requests.Session.post")
+    def test_no_show_payloads_no_stdout(self, mock_post, client, capsys):
+        """Test that show_payloads=False (default) prints nothing to stdout."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = self.MOCK_EXECUTE_RESPONSE
+        mock_response.text = "success"
+        mock_post.return_value = mock_response
+
+        client.execute_run("Hello", "session-1")
+
+        captured = capsys.readouterr()
+        assert "[request]" not in captured.out
+        assert "[response]" not in captured.out

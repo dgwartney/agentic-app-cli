@@ -7,9 +7,22 @@ Provides CLI commands for executing runs and checking status.
 import argparse
 import getpass
 import json
+import os
+import signal
 import sys
 import time
+import uuid
+from pathlib import Path
 from typing import NoReturn, Optional
+
+try:
+    import readline as _readline
+    _READLINE_AVAILABLE = True
+except ImportError:
+    _READLINE_AVAILABLE = False
+
+_CHAT_HISTORY_FILE = Path.home() / ".kore" / "chat_history"
+_CHAT_HISTORY_MAX = 1000
 
 from agxr import __version__
 from agxr.client import AgenticAPIClient
@@ -371,6 +384,11 @@ Environment Variables:
             help="JSON string of metadata key-value pairs",
             metavar="JSON",
         )
+        execute_parser.add_argument(
+            "--show-payloads",
+            action="store_true",
+            help="Print raw request and response JSON to stdout (unmasked)",
+        )
 
         # Status command
         status_parser = subparsers.add_parser(
@@ -454,6 +472,17 @@ Environment Variables:
             "--metadata",
             help="JSON string of metadata key-value pairs",
             metavar="JSON",
+        )
+        chat_parser.add_argument(
+            "--show-payloads",
+            action="store_true",
+            help="Print raw request and response JSON to stdout (unmasked)",
+        )
+        chat_parser.add_argument(
+            "--vi",
+            action="store_true",
+            default=False,
+            help="Use vi key bindings for line editing (default: emacs)",
         )
 
         # Profile command (with its own subcommands)
@@ -645,8 +674,63 @@ Environment Variables:
         Example:
             'chat-a1b2c3d4-e5f6-4789-a0b1-c2d3e4f5g6h7'
         """
-        import uuid
         return f"chat-{uuid.uuid4()}"
+
+    def _terminate_chat_session(self, session_reference: str) -> None:
+        """Terminate a server-side chat session. Silently ignores errors (best-effort cleanup)."""
+        logger = get_logger()
+        try:
+            self.client.terminate_session(session_reference)
+            logger.info(f"Session terminated: {session_reference}")
+        except AgenticAPIError:
+            logger.debug(f"Could not terminate session {session_reference}", exc_info=True)
+
+    def _setup_readline(self, vi_mode: bool = False) -> None:
+        """Initialize readline for line editing, history navigation, and tab completion."""
+        if not _READLINE_AVAILABLE:
+            return
+
+        if _CHAT_HISTORY_FILE.exists():
+            try:
+                _readline.read_history_file(str(_CHAT_HISTORY_FILE))
+            except OSError:
+                pass
+
+        _readline.set_history_length(_CHAT_HISTORY_MAX)
+
+        # Detect backend once; libedit (macOS default) uses different syntax to GNU readline
+        _is_libedit = bool(_readline.__doc__ and "libedit" in _readline.__doc__)
+
+        if vi_mode:
+            # libedit: "bind -v"  |  GNU readline: "set editing-mode vi"
+            _readline.parse_and_bind("bind -v" if _is_libedit else "set editing-mode vi")
+
+        _commands = [
+            "#help", "#new", "#newsession", "#info", "#session",
+            "#clear", "#debug", "#stream", "#history", "#timing", "#payload",
+            "exit", "quit",
+        ]
+
+        def _completer(text, state):
+            options = [c for c in _commands if c.startswith(text)]
+            return options[state] if state < len(options) else None
+
+        _readline.set_completer(_completer)
+
+        # Tab completion binding also differs between backends
+        if _is_libedit:
+            _readline.parse_and_bind("bind ^I rl_complete")
+        else:
+            _readline.parse_and_bind("tab: complete")
+
+    def _save_readline_history(self) -> None:
+        """Write readline input history to disk."""
+        if not _READLINE_AVAILABLE:
+            return
+        try:
+            _readline.write_history_file(str(_CHAT_HISTORY_FILE))
+        except OSError:
+            pass
 
     def _print_chat_banner(self, session_id: str, env_name: str) -> None:
         """
@@ -694,7 +778,8 @@ Environment Variables:
         self,
         user_input: str,
         args: argparse.Namespace,
-        session_id: str
+        session_id: str,
+        conversation_history: list | None = None,
     ) -> tuple[bool, str | None]:
         """
         Handle special commands (starting with #) in chat mode.
@@ -703,6 +788,7 @@ Environment Variables:
             user_input: The user input string (already stripped)
             args: Parsed command-line arguments (mutable, modified in place)
             session_id: Current session ID
+            conversation_history: List of conversation turns for #history command
 
         Returns:
             Tuple of (should_continue, new_session_id):
@@ -716,6 +802,10 @@ Environment Variables:
         command = parts[0].lower()  # Case-insensitive
         command_args = parts[1].strip() if len(parts) > 1 else ""
 
+        if command == '#history':
+            logger.debug("Handling special command: #history")
+            return self._chat_cmd_history(command_args, args, session_id, conversation_history)
+
         # Command dispatch table with aliases
         command_handlers = {
             '#help': self._chat_cmd_help,
@@ -726,8 +816,8 @@ Environment Variables:
             '#clear': self._chat_cmd_clear,
             '#debug': self._chat_cmd_debug,
             '#stream': self._chat_cmd_stream,
-            '#history': self._chat_cmd_history,
             '#timing': self._chat_cmd_timing,
+            '#payload': self._chat_cmd_payload,
         }
 
         if command in command_handlers:
@@ -751,6 +841,7 @@ Environment Variables:
         print("  #debug on|off      - Toggle debug mode")
         print("  #stream on|off|tokens|messages|custom - Toggle streaming")
         print("  #timing on|off     - Toggle request/response timing display")
+        print("  #payload on|off    - Toggle request/response payload display (unmasked JSON)")
         print("\nTo exit chat, type: exit, quit, or q")
         print()
         return (True, None)
@@ -822,24 +913,46 @@ Environment Variables:
     def _chat_cmd_new(
         self, command_args: str, args: argparse.Namespace, session_id: str
     ) -> tuple[bool, str | None]:
-        """Start a new session with new session ID."""
+        """Start a new session using the Kore.ai Sessions API."""
         logger = get_logger()
 
-        # Generate new session ID
-        new_session_id = self._generate_simple_session_id()
+        old_session_reference = session_id  # currently active sessionReference
+
+        # Terminate old session (best-effort)
+        self._terminate_chat_session(old_session_reference)
+
+        # Create new server-side session
+        user_reference = getattr(args, '_chat_user_reference', None) or f"cli-{uuid.uuid4()}"
+        try:
+            session_data = self.client.create_session(
+                user_reference=user_reference,
+                show_payloads=getattr(args, 'show_payloads', False),
+            )
+            new_session_reference = session_data["sessionReference"]
+            args._chat_session_id = session_data["sessionId"]
+        except AgenticAPIError as e:
+            print(f"Error creating new session: {e.message}", file=sys.stderr)
+            return (True, None)
 
         # Display banner
         print(f"\n{self.BANNER_BOX_COLOR}╔═══════════════════════════════════════╗{self.CHAT_RESET_COLOR}")
         print(f"{self.BANNER_BOX_COLOR}║{self.CHAT_RESET_COLOR}         {self.BANNER_TEXT_COLOR}New Session Started{self.CHAT_RESET_COLOR}           {self.BANNER_BOX_COLOR}║{self.CHAT_RESET_COLOR}")
         print(f"{self.BANNER_BOX_COLOR}╚═══════════════════════════════════════╝{self.CHAT_RESET_COLOR}")
-        print(f"{self.BANNER_LABEL_COLOR}Previous Session:{self.CHAT_RESET_COLOR} {self.BANNER_VALUE_COLOR}{session_id}{self.CHAT_RESET_COLOR}")
-        print(f"{self.BANNER_LABEL_COLOR}New Session:{self.CHAT_RESET_COLOR} {self.BANNER_VALUE_COLOR}{new_session_id}{self.CHAT_RESET_COLOR}")
+        print(f"{self.BANNER_LABEL_COLOR}Previous Session:{self.CHAT_RESET_COLOR} {self.BANNER_VALUE_COLOR}{old_session_reference}{self.CHAT_RESET_COLOR}")
+        print(f"{self.BANNER_LABEL_COLOR}New Session:{self.CHAT_RESET_COLOR} {self.BANNER_VALUE_COLOR}{new_session_reference}{self.CHAT_RESET_COLOR}")
         print()
 
-        logger.info(f"New session started. Old: {session_id}, New: {new_session_id}")
+        logger.info(f"New session started. Old: {old_session_reference}, New: {new_session_reference}")
 
-        # Return new session ID
-        return (True, new_session_id)
+        # Display agent's initial message if the new session response included one
+        if session_data.get("output"):
+            self._print_chat_response(
+                session_data,
+                verbose=getattr(args, 'verbose', False),
+            )
+
+        # Return new session reference
+        return (True, new_session_reference)
 
     def _chat_cmd_info(
         self, command_args: str, args: argparse.Namespace, session_id: str
@@ -891,8 +1004,6 @@ Environment Variables:
         self, command_args: str, args: argparse.Namespace, session_id: str
     ) -> tuple[bool, str | None]:
         """Clear the terminal screen."""
-        import os
-
         # Cross-platform clear screen
         os.system('cls' if os.name == 'nt' else 'clear')
 
@@ -902,11 +1013,83 @@ Environment Variables:
         return (True, None)
 
     def _chat_cmd_history(
+        self,
+        command_args: str,
+        args: argparse.Namespace,
+        session_id: str,
+        conversation_history: list | None = None,
+    ) -> tuple[bool, str | None]:
+        """Display conversation history for the current session."""
+        history = conversation_history or []
+        if not history:
+            print("No conversation history yet.")
+            return (True, None)
+
+        n = len(history)
+        if command_args:
+            try:
+                n = max(1, int(command_args.strip()))
+            except ValueError:
+                print("Usage: #history [n]  — show last n turns")
+                return (True, None)
+
+        turns = history[-n:]
+        print()
+        for idx, turn in enumerate(turns, start=len(history) - len(turns) + 1):
+            print(f"[{idx}] You: {turn['user']}")
+            print(f"    Agent: {turn['agent']}")
+            print()
+
+        return (True, None)
+
+    def _chat_cmd_timing(
         self, command_args: str, args: argparse.Namespace, session_id: str
     ) -> tuple[bool, str | None]:
-        """Show conversation history (future feature)."""
-        print("History feature not yet implemented.")
-        print("Future: This will show your conversation history.")
+        """Handle #timing on|off command."""
+        logger = get_logger()
+
+        if not command_args:
+            state = "enabled" if getattr(args, 'timing', False) else "disabled"
+            print(f"Timing is currently {state}")
+            return (True, None)
+
+        arg = command_args.lower()
+        if arg == "on":
+            args.timing = True
+            print("Timing enabled")
+            logger.info("Request timing enabled via chat command")
+        elif arg == "off":
+            args.timing = False
+            print("Timing disabled")
+            logger.info("Request timing disabled via chat command")
+        else:
+            print(f"Invalid argument: '{command_args}'. Use '#timing on' or '#timing off'")
+
+        return (True, None)
+
+    def _chat_cmd_payload(
+        self, command_args: str, args: argparse.Namespace, session_id: str
+    ) -> tuple[bool, str | None]:
+        """Handle #payload on|off command."""
+        logger = get_logger()
+
+        if not command_args:
+            state = "enabled" if getattr(args, 'show_payloads', False) else "disabled"
+            print(f"Payload display is currently {state}")
+            return (True, None)
+
+        arg = command_args.lower()
+        if arg == "on":
+            args.show_payloads = True
+            print("Payload display enabled")
+            logger.info("Payload display enabled via chat command")
+        elif arg == "off":
+            args.show_payloads = False
+            print("Payload display disabled")
+            logger.info("Payload display disabled via chat command")
+        else:
+            print(f"Invalid argument: '{command_args}'. Use '#payload on' or '#payload off'")
+
         return (True, None)
 
     def _chat_cmd_timing(
@@ -986,6 +1169,7 @@ Environment Variables:
                 debug_enabled=args.debug if hasattr(args, 'debug') else False,
                 debug_mode=debug_mode,
                 metadata=metadata,
+                show_payloads=getattr(args, 'show_payloads', False),
             )
 
             logger.info("Run execution completed successfully")
@@ -1051,14 +1235,7 @@ Environment Variables:
         """
         logger = get_logger()
 
-        # Generate or use provided session ID
-        session_id = (
-            args.session_id
-            if hasattr(args, 'session_id') and args.session_id
-            else self._generate_simple_session_id()
-        )
-
-        # Parse metadata if provided
+        # Parse metadata if provided (validate before any API calls)
         metadata = None
         if hasattr(args, 'metadata') and args.metadata:
             try:
@@ -1082,85 +1259,176 @@ Environment Variables:
         if not hasattr(args, 'timing'):
             args.timing = False
 
+        # Initialize payload display state (off by default)
+        if not hasattr(args, 'show_payloads'):
+            args.show_payloads = False
+
+        # Determine user reference; use --user-id if provided (e.g. a real Kore.ai user ID
+        # like "u-94439ba8-..."), otherwise auto-generate a CLI-scoped reference
+        user_reference = getattr(args, 'user_id', None) or f"cli-{uuid.uuid4()}"
+
+        # Create server-side session via Kore.ai Sessions API
+        try:
+            session_data = self.client.create_session(
+                user_reference=user_reference,
+                session_reference=args.session_id if hasattr(args, 'session_id') and args.session_id else None,
+                show_payloads=getattr(args, 'show_payloads', False),
+            )
+            session_reference = session_data["sessionReference"]
+            args._chat_session_id = session_data["sessionId"]
+            logger.info(f"Session created: {session_reference} (sessionId: {args._chat_session_id})")
+        except AgenticAPIError as e:
+            logger.error(f"Failed to create session: {e.message}")
+            print(f"Error: Could not create session: {e.message}", file=sys.stderr)
+            return 1
+
+        # Store user_reference so #new command can reuse it
+        args._chat_user_reference = user_reference
+
+
         # Display welcome banner
-        self._print_chat_banner(session_id, self.config.env_name)
+        self._print_chat_banner(session_reference, self.config.env_name)
 
-        logger.info(f"Starting chat session: {session_id}")
+        # Display agent's initial message if the session response included one
+        if session_data.get("output"):
+            self._print_chat_response(
+                session_data,
+                verbose=args.verbose if hasattr(args, 'verbose') else False,
+            )
 
-        # Main chat loop
-        while True:
-            try:
-                # Get user input
-                user_input = input(f"\n{self.CHAT_USER_COLOR}You:{self.CHAT_RESET_COLOR} ").strip()
+        logger.info(f"Starting chat session: {session_reference}")
 
-                # Skip empty input
-                if not user_input:
-                    continue
+        # Set up readline for line editing, history navigation, and tab completion
+        self._setup_readline(vi_mode=getattr(args, 'vi', False))
 
-                # Check for special commands (starts with #)
-                if user_input.startswith('#'):
-                    should_continue, new_session = self._handle_chat_special_command(
-                        user_input, args, session_id
-                    )
-                    # Update session ID if command changed it
-                    if new_session:
-                        session_id = new_session
-                    # Exit loop if command requested it
-                    if not should_continue:
+        # Install signal handlers so readline history is flushed on SIGTERM/SIGHUP.
+        # These signals bypass Python's try/finally, so we handle them explicitly.
+        # HTTP calls (session termination) are unsafe in signal handlers — we only
+        # save local state; the server session will expire naturally.
+        def _signal_handler(signum, frame):
+            self._save_readline_history()
+            signal.signal(signum, signal.SIG_DFL)
+            os.kill(os.getpid(), signum)
+
+        _orig_sigterm = signal.signal(signal.SIGTERM, _signal_handler)
+        _orig_sighup = getattr(signal, 'SIGHUP', None)
+        if _orig_sighup is not None:
+            _orig_sighup_handler = signal.signal(signal.SIGHUP, _signal_handler)
+
+        # Track user/agent turns for the #history command
+        conversation_history: list[dict[str, str]] = []
+
+        # Main chat loop — try/finally ensures history is saved on all clean exits
+        try:
+            while True:
+                try:
+                    # Get user input.
+                    # The blank line is printed separately so readline never
+                    # sees a '\n' inside the prompt string — readline uses the
+                    # prompt length to calculate cursor position, and a leading
+                    # newline would offset that by 1 column when recalling history.
+                    # ANSI codes are wrapped with \001/\002 (RL_PROMPT_START/END_IGNORE)
+                    # so readline excludes them from the visible-width count.
+                    print()
+                    if _READLINE_AVAILABLE:
+                        _s, _e = "\001", "\002"
+                    else:
+                        _s = _e = ""
+                    _prompt = f"{_s}{self.CHAT_USER_COLOR}{_e}You:{_s}{self.CHAT_RESET_COLOR}{_e} "
+                    user_input = input(_prompt).strip()
+
+                    # Skip empty input
+                    if not user_input:
+                        continue
+
+                    # Check for special commands (starts with #)
+                    if user_input.startswith('#'):
+                        should_continue, new_session = self._handle_chat_special_command(
+                            user_input, args, session_reference,
+                            conversation_history=conversation_history,
+                        )
+                        # Update session reference if command changed it (e.g. #new)
+                        if new_session:
+                            session_reference = new_session
+                            conversation_history = []
+                        # Exit loop if command requested it
+                        if not should_continue:
+                            return 0
+                        # Continue to next iteration (don't execute as query)
+                        continue
+
+                    # Check for exit commands
+                    if user_input.lower() in ['exit', 'quit', 'q']:
+                        print("\nGoodbye! Session ended.")
+                        logger.info("Chat session ended by user")
+                        self._terminate_chat_session(session_reference)
                         return 0
-                    # Continue to next iteration (don't execute as query)
-                    continue
 
-                # Check for exit commands
-                if user_input.lower() in ['exit', 'quit', 'q']:
-                    print("\nGoodbye! Session ended.")
-                    logger.info("Chat session ended by user")
+                    # Execute the query
+                    logger.debug(f"Sending query: {user_input}")
+                    _t0 = time.perf_counter()
+                    response = self.client.execute_run(
+                        query=user_input,
+                        session_identity=session_reference,
+                        user_reference=user_reference,
+                        stream_enabled=bool(args.stream) if hasattr(args, 'stream') and args.stream else False,
+                        stream_mode=args.stream if hasattr(args, 'stream') and args.stream else None,
+                        debug_enabled=args.debug if hasattr(args, 'debug') else False,
+                        debug_mode=debug_mode,
+                        metadata=metadata,
+                        show_payloads=getattr(args, 'show_payloads', False),
+                        session_id=getattr(args, '_chat_session_id', None),
+                    )
+                    _elapsed = time.perf_counter() - _t0
+
+                    # Display response
+                    self._print_chat_response(
+                        response,
+                        verbose=args.verbose if hasattr(args, 'verbose') else False
+                    )
+
+                    # Record turn in conversation history
+                    agent_text = " ".join(
+                        item.get("content", "")
+                        for item in response.get("output", [])
+                        if item.get("type") == "text"
+                    )
+                    conversation_history.append({"user": user_input, "agent": agent_text})
+
+                    # Display timing if enabled
+                    if getattr(args, 'timing', False):
+                        print(f"\n{self.INFO_LABEL_COLOR}[timing]{self.CHAT_RESET_COLOR} {_elapsed:.3f}s")
+
+                except EOFError:
+                    # Ctrl+D pressed
+                    print("\n\nGoodbye! Session ended.")
+                    logger.info("Chat session ended by EOF (Ctrl+D)")
+                    self._terminate_chat_session(session_reference)
                     return 0
 
-                # Execute the query
-                logger.debug(f"Sending query: {user_input}")
-                _t0 = time.perf_counter()
-                response = self.client.execute_run(
-                    query=user_input,
-                    session_identity=session_id,
-                    user_reference=getattr(args, 'user_id', None),
-                    stream_enabled=bool(args.stream) if hasattr(args, 'stream') and args.stream else False,
-                    stream_mode=args.stream if hasattr(args, 'stream') and args.stream else None,
-                    debug_enabled=args.debug if hasattr(args, 'debug') else False,
-                    debug_mode=debug_mode,
-                    metadata=metadata,
-                )
-                _elapsed = time.perf_counter() - _t0
+                except KeyboardInterrupt:
+                    # Ctrl+C - let global handler print message
+                    logger.info("Chat session interrupted by user (Ctrl+C)")
+                    self._terminate_chat_session(session_reference)
+                    return 130
 
-                # Display response
-                self._print_chat_response(
-                    response,
-                    verbose=args.verbose if hasattr(args, 'verbose') else False
-                )
+                except AgenticAPIError as e:
+                    # API errors - show error but continue chat
+                    logger.error(f"API error during chat: {e.message}", exc_info=True)
+                    print(f"\nError: {e.message}", file=sys.stderr)
+                    if hasattr(args, 'verbose') and args.verbose and e.status_code:
+                        print(f"Status Code: {e.status_code}", file=sys.stderr)
+                    # Continue loop to allow retry
+                    continue
 
-                # Display timing if enabled
-                if getattr(args, 'timing', False):
-                    print(f"\n{self.INFO_LABEL_COLOR}[timing]{self.CHAT_RESET_COLOR} {_elapsed:.3f}s")
-
-            except EOFError:
-                # Ctrl+D pressed
-                print("\n\nGoodbye! Session ended.")
-                logger.info("Chat session ended by EOF (Ctrl+D)")
-                return 0
-
-            except KeyboardInterrupt:
-                # Ctrl+C - let global handler print message
-                logger.info("Chat session interrupted by user (Ctrl+C)")
-                return 130
-
-            except AgenticAPIError as e:
-                # API errors - show error but continue chat
-                logger.error(f"API error during chat: {e.message}", exc_info=True)
-                print(f"\nError: {e.message}", file=sys.stderr)
-                if hasattr(args, 'verbose') and args.verbose and e.status_code:
-                    print(f"Status Code: {e.status_code}", file=sys.stderr)
-                # Continue loop to allow retry
-                continue
+        finally:
+            # Restore original signal handlers and persist readline history.
+            # Runs on all clean Python exits (return/exception). The signal handler
+            # above covers SIGTERM/SIGHUP which bypass this block.
+            signal.signal(signal.SIGTERM, _orig_sigterm)
+            if _orig_sighup is not None:
+                signal.signal(signal.SIGHUP, _orig_sighup_handler)
+            self._save_readline_history()
 
     def _handle_config(self, args: argparse.Namespace) -> int:
         """
